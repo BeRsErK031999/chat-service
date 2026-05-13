@@ -1,0 +1,238 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum AuthSource {
+  TTS
+  STANDALONE
+  SYSTEM
+}
+
+enum RoomType {
+  TASK
+  DIRECT
+  GROUP
+  SYSTEM
+}
+
+enum RoomVisibility {
+  PRIVATE
+  RESTRICTED
+}
+
+enum TaskRoomKind {
+  INTERNAL
+  MANAGER
+  CUSTOMER
+  SYSTEM_EVENTS
+}
+
+enum RoomMemberRole {
+  OWNER
+  MANAGER
+  MEMBER
+  OBSERVER
+  SYSTEM
+}
+
+enum RoomMemberSource {
+  TTS_TASK
+  TTS_PROJECT
+  MANUAL
+  STANDALONE
+  SYSTEM
+}
+
+enum NotificationLevel {
+  ALL
+  MENTIONS
+  NONE
+}
+
+enum MessageType {
+  TEXT
+  SYSTEM_EVENT
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+}
+
+enum NotificationDeliveryState {
+  PENDING
+  DELIVERED
+  READ
+  FAILED
+  SUPPRESSED
+}
+
+model User {
+  id             String         @id @default(uuid()) @db.Uuid
+  externalUserId String?        @unique
+  email          String?        @unique
+  displayName    String
+  avatarUrl      String?
+  role           String         @default("user")
+  status         UserStatus     @default(ACTIVE)
+  authSource     AuthSource     @default(STANDALONE)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  lastSeenAt     DateTime?
+
+  createdRooms  Room[]         @relation("RoomCreatedBy")
+  roomMembers   RoomMember[]
+  sentMessages  Message[]      @relation("MessageSender")
+  readStates    ReadState[]
+  notifications Notification[]
+
+  @@index([status])
+}
+
+model Room {
+  id               String        @id @default(uuid()) @db.Uuid
+  type             RoomType
+  visibility       RoomVisibility @default(PRIVATE)
+  name             String?
+  description      String?
+  taskId           String?
+  projectId        String?
+  taskRoomKind     TaskRoomKind?
+  createdByUserId  String?       @db.Uuid
+  createdByEventId String?
+  lastMessageId    String?       @db.Uuid
+  lastMessageAt    DateTime?
+  isArchived       Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  createdBy     User?          @relation("RoomCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  members       RoomMember[]
+  messages      Message[]
+  readStates    ReadState[]
+  notifications Notification[]
+  taskRoomLinks TaskRoomLink[]
+
+  @@index([type])
+  @@index([taskId])
+  @@index([projectId])
+  @@index([lastMessageAt])
+  @@index([type, taskId, taskRoomKind])
+}
+
+model RoomMember {
+  id                String            @id @default(uuid()) @db.Uuid
+  roomId            String            @db.Uuid
+  userId            String            @db.Uuid
+  role              RoomMemberRole    @default(MEMBER)
+  source            RoomMemberSource  @default(STANDALONE)
+  notificationLevel NotificationLevel @default(ALL)
+  joinedAt          DateTime          @default(now())
+  leftAt            DateTime?
+  mutedUntil        DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([userId, leftAt])
+  @@index([roomId, leftAt])
+}
+
+model Message {
+  id            String      @id @default(uuid()) @db.Uuid
+  roomId        String      @db.Uuid
+  senderUserId  String?     @db.Uuid
+  type          MessageType
+  body          String?
+  eventType     String?
+  eventPayload  Json        @default("{}")
+  sourceEventId String?     @unique
+  sequence      Int
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  room          Room           @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender        User?          @relation("MessageSender", fields: [senderUserId], references: [id], onDelete: SetNull)
+  readStates    ReadState[]    @relation("LastReadMessage")
+  notifications Notification[]
+
+  @@unique([roomId, sequence])
+  @@index([roomId, createdAt])
+}
+
+model ReadState {
+  id                  String    @id @default(uuid()) @db.Uuid
+  roomId              String    @db.Uuid
+  userId              String    @db.Uuid
+  lastReadMessageId   String?   @db.Uuid
+  lastReadSequence    Int       @default(0)
+  lastReadAt          DateTime?
+  unreadCountSnapshot Int       @default(0)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  room            Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadMessage Message? @relation("LastReadMessage", fields: [lastReadMessageId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, roomId])
+  @@index([roomId, lastReadSequence])
+}
+
+model Notification {
+  id             String                    @id @default(uuid()) @db.Uuid
+  userId         String                    @db.Uuid
+  roomId         String?                   @db.Uuid
+  messageId      String?                   @db.Uuid
+  type           String
+  title          String
+  body           String
+  priority       NotificationPriority      @default(NORMAL)
+  payload        Json                      @default("{}")
+  deliveryState  NotificationDeliveryState @default(PENDING)
+  readAt         DateTime?
+  deliveredAt    DateTime?
+  sourceEventId  String?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room    Room?    @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  message Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([userId, readAt, createdAt])
+  @@index([userId, deliveryState, createdAt])
+  @@index([sourceEventId])
+}
+
+model TaskRoomLink {
+  id               String       @id @default(uuid()) @db.Uuid
+  taskId           String
+  projectId        String?
+  roomId           String       @unique @db.Uuid
+  kind             TaskRoomKind
+  source           AuthSource   @default(STANDALONE)
+  isPrimary        Boolean      @default(false)
+  createdByEventId String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, kind])
+  @@index([projectId])
+}
