@@ -27,15 +27,25 @@ be reused, but the final delivery target is this service's own persistence model
 - Health and readiness endpoints.
 - Vitest coverage for environment validation, health endpoints, and room domain helpers.
 
+## Phase 1B Scope
+
+- Basic protected HTTP API for rooms, room messages, read states, and notifications.
+- Temporary local/dev auth via `x-user-id: <uuid>` header.
+- Zod validation for route params, query strings, and request bodies.
+- Membership checks before reading rooms, posting messages, or updating read states.
+- Notification ownership checks before marking notifications read.
+- Route tests use Prisma mocks and do not require a local PostgreSQL instance.
+
 ## Not Included Yet
 
 - WebSocket gateway.
 - NATS consumers or publishers.
-- Full chat HTTP API.
-- Auth implementation beyond `AUTH_MODE` configuration.
+- Full SSO/JWT auth.
 - Real database migrations.
 - Docker packaging.
 - Attachments, images, reactions, calls, complex search, or end-to-end encryption.
+
+See [docs/http-api.md](docs/http-api.md) for the current HTTP endpoints.
 
 ## Commands
 

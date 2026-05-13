@@ -48,3 +48,32 @@ export const createMessage = async (
     return message;
   });
 };
+
+export type ListRoomMessagesInput = {
+  roomId: string;
+  limit: number;
+  beforeSequence?: number;
+};
+
+export const listRoomMessages = async (
+  prisma: PrismaClient,
+  input: ListRoomMessagesInput,
+): Promise<Message[]> => {
+  const where: Prisma.MessageWhereInput = {
+    roomId: input.roomId,
+  };
+
+  if (input.beforeSequence !== undefined) {
+    where.sequence = {
+      lt: input.beforeSequence,
+    };
+  }
+
+  return prisma.message.findMany({
+    where,
+    orderBy: {
+      sequence: 'desc',
+    },
+    take: input.limit,
+  });
+};
