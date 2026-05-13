@@ -18,170 +18,199 @@ import type { Message, Prisma, Room, User } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const devTaskId = 'task-123';
-const devProjectId = 'project-123';
-const devRoomKind = TaskRoomKind.INTERNAL;
+const artemId = '11111111-1111-4111-8111-111111111111';
+const testerId = '22222222-2222-4222-8222-222222222222';
+const taskId = 'task-123';
+const projectId = 'internal';
 
 type DevUsers = {
-  manager: User;
-  employee: User;
-  observer: User;
+  artem: User;
+  tester: User;
 };
 
+const upsertUser = async (data: {
+  id: string;
+  externalUserId: string;
+  email: string;
+  displayName: string;
+  role: string;
+}): Promise<User> =>
+  prisma.user.upsert({
+    where: {
+      id: data.id,
+    },
+    create: {
+      id: data.id,
+      externalUserId: data.externalUserId,
+      email: data.email,
+      displayName: data.displayName,
+      role: data.role,
+      status: UserStatus.ACTIVE,
+      authSource: AuthSource.STANDALONE,
+    },
+    update: {
+      externalUserId: data.externalUserId,
+      email: data.email,
+      displayName: data.displayName,
+      role: data.role,
+      status: UserStatus.ACTIVE,
+      authSource: AuthSource.STANDALONE,
+    },
+  });
+
 const upsertDevUsers = async (): Promise<DevUsers> => {
-  const manager = await prisma.user.upsert({
-    where: {
-      externalUserId: 'dev-manager',
-    },
-    create: {
-      externalUserId: 'dev-manager',
-      email: 'dev-manager@example.test',
-      displayName: 'Dev Manager',
-      role: 'manager',
-      status: UserStatus.ACTIVE,
-      authSource: AuthSource.STANDALONE,
-    },
-    update: {
-      email: 'dev-manager@example.test',
-      displayName: 'Dev Manager',
-      role: 'manager',
-      status: UserStatus.ACTIVE,
-      authSource: AuthSource.STANDALONE,
-    },
+  const artem = await upsertUser({
+    id: artemId,
+    externalUserId: 'dev-artem',
+    email: 'artem@example.test',
+    displayName: 'Artem',
+    role: 'manager',
   });
 
-  const employee = await prisma.user.upsert({
-    where: {
-      externalUserId: 'dev-employee',
-    },
-    create: {
-      externalUserId: 'dev-employee',
-      email: 'dev-employee@example.test',
-      displayName: 'Dev Employee',
-      role: 'employee',
-      status: UserStatus.ACTIVE,
-      authSource: AuthSource.STANDALONE,
-    },
-    update: {
-      email: 'dev-employee@example.test',
-      displayName: 'Dev Employee',
-      role: 'employee',
-      status: UserStatus.ACTIVE,
-      authSource: AuthSource.STANDALONE,
-    },
-  });
-
-  const observer = await prisma.user.upsert({
-    where: {
-      externalUserId: 'dev-observer',
-    },
-    create: {
-      externalUserId: 'dev-observer',
-      email: 'dev-observer@example.test',
-      displayName: 'Dev Observer',
-      role: 'observer',
-      status: UserStatus.ACTIVE,
-      authSource: AuthSource.STANDALONE,
-    },
-    update: {
-      email: 'dev-observer@example.test',
-      displayName: 'Dev Observer',
-      role: 'observer',
-      status: UserStatus.ACTIVE,
-      authSource: AuthSource.STANDALONE,
-    },
+  const tester = await upsertUser({
+    id: testerId,
+    externalUserId: 'dev-tester',
+    email: 'tester@example.test',
+    displayName: 'Tester',
+    role: 'tester',
   });
 
   return {
-    manager,
-    employee,
-    observer,
+    artem,
+    tester,
   };
 };
 
-const upsertDevRoom = async (manager: User): Promise<Room> => {
+const upsertRoomByName = async (data: {
+  type: RoomType;
+  name: string;
+  description: string;
+  createdByUserId: string;
+  taskId?: string;
+  projectId?: string;
+  taskRoomKind?: TaskRoomKind;
+}): Promise<Room> => {
   const existingRoom = await prisma.room.findFirst({
     where: {
-      type: RoomType.TASK,
-      taskId: devTaskId,
-      projectId: devProjectId,
-      taskRoomKind: devRoomKind,
+      name: data.name,
+      type: data.type,
+      taskId: data.taskId ?? null,
+      taskRoomKind: data.taskRoomKind ?? null,
     },
   });
+
+  const roomData = {
+    type: data.type,
+    visibility: RoomVisibility.PRIVATE,
+    name: data.name,
+    description: data.description,
+    taskId: data.taskId ?? null,
+    projectId: data.projectId ?? null,
+    taskRoomKind: data.taskRoomKind ?? null,
+    createdByUserId: data.createdByUserId,
+    isArchived: false,
+  };
 
   if (existingRoom !== null) {
     return prisma.room.update({
       where: {
         id: existingRoom.id,
       },
-      data: {
-        visibility: RoomVisibility.PRIVATE,
-        name: 'Dev Task Room',
-        description: 'Local development task chat room.',
-        createdByUserId: manager.id,
-        isArchived: false,
-      },
+      data: roomData,
     });
   }
 
   return prisma.room.create({
-    data: {
-      type: RoomType.TASK,
-      visibility: RoomVisibility.PRIVATE,
-      name: 'Dev Task Room',
-      description: 'Local development task chat room.',
-      taskId: devTaskId,
-      projectId: devProjectId,
-      taskRoomKind: devRoomKind,
-      createdByUserId: manager.id,
+    data: roomData,
+  });
+};
+
+const upsertRooms = async (users: DevUsers): Promise<Room[]> => {
+  const directRoom = await upsertRoomByName({
+    type: RoomType.DIRECT,
+    name: 'Direct Chat',
+    description: 'Temporary direct chat for manual testing.',
+    createdByUserId: users.artem.id,
+  });
+
+  const teamRoom = await upsertRoomByName({
+    type: RoomType.GROUP,
+    name: 'Team Room',
+    description: 'Temporary group room for manual testing.',
+    createdByUserId: users.artem.id,
+  });
+
+  const taskRoom = await upsertRoomByName({
+    type: RoomType.TASK,
+    name: 'task-123/internal',
+    description: 'Temporary task room for manual testing.',
+    createdByUserId: users.artem.id,
+    taskId,
+    projectId,
+    taskRoomKind: TaskRoomKind.INTERNAL,
+  });
+
+  await prisma.taskRoomLink.upsert({
+    where: {
+      taskId_kind: {
+        taskId,
+        kind: TaskRoomKind.INTERNAL,
+      },
+    },
+    create: {
+      taskId,
+      projectId,
+      roomId: taskRoom.id,
+      kind: TaskRoomKind.INTERNAL,
+      source: AuthSource.STANDALONE,
+      isPrimary: true,
+    },
+    update: {
+      projectId,
+      roomId: taskRoom.id,
+      source: AuthSource.STANDALONE,
+      isPrimary: true,
+    },
+  });
+
+  return [directRoom, teamRoom, taskRoom];
+};
+
+const upsertMembership = async (
+  room: Room,
+  user: User,
+  role: RoomMemberRole,
+): Promise<void> => {
+  await prisma.roomMember.upsert({
+    where: {
+      roomId_userId: {
+        roomId: room.id,
+        userId: user.id,
+      },
+    },
+    create: {
+      roomId: room.id,
+      userId: user.id,
+      role,
+      source: RoomMemberSource.STANDALONE,
+      notificationLevel: NotificationLevel.ALL,
+    },
+    update: {
+      role,
+      source: RoomMemberSource.STANDALONE,
+      notificationLevel: NotificationLevel.ALL,
+      leftAt: null,
     },
   });
 };
 
-const upsertMemberships = async (room: Room, users: DevUsers): Promise<void> => {
-  await prisma.roomMember.upsert({
-    where: {
-      roomId_userId: {
-        roomId: room.id,
-        userId: users.manager.id,
-      },
-    },
-    create: {
-      roomId: room.id,
-      userId: users.manager.id,
-      role: RoomMemberRole.MANAGER,
-      source: RoomMemberSource.STANDALONE,
-      notificationLevel: NotificationLevel.ALL,
-    },
-    update: {
-      role: RoomMemberRole.MANAGER,
-      source: RoomMemberSource.STANDALONE,
-      notificationLevel: NotificationLevel.ALL,
-      leftAt: null,
-    },
-  });
-
-  await prisma.roomMember.upsert({
-    where: {
-      roomId_userId: {
-        roomId: room.id,
-        userId: users.employee.id,
-      },
-    },
-    create: {
-      roomId: room.id,
-      userId: users.employee.id,
-      role: RoomMemberRole.MEMBER,
-      source: RoomMemberSource.STANDALONE,
-      notificationLevel: NotificationLevel.ALL,
-    },
-    update: {
-      role: RoomMemberRole.MEMBER,
-      source: RoomMemberSource.STANDALONE,
-      notificationLevel: NotificationLevel.ALL,
-      leftAt: null,
-    },
-  });
+const upsertMemberships = async (rooms: Room[], users: DevUsers): Promise<void> => {
+  await Promise.all(
+    rooms.flatMap((room) => [
+      upsertMembership(room, users.artem, RoomMemberRole.MANAGER),
+      upsertMembership(room, users.tester, RoomMemberRole.MEMBER),
+    ]),
+  );
 };
 
 const upsertMessage = async (
@@ -220,138 +249,133 @@ const upsertMessage = async (
     },
   });
 
-const upsertMessages = async (room: Room, users: DevUsers): Promise<Message[]> => {
+const seedRoomMessages = async (room: Room, users: DevUsers): Promise<Message[]> => {
+  const roomKey = room.name ?? room.id;
   const messages = [
     await upsertMessage(room, 1, {
       type: MessageType.SYSTEM_EVENT,
-      eventType: 'task.created',
+      eventType: 'manual-testing.room-ready',
       eventPayload: {
-        taskId: devTaskId,
-        projectId: devProjectId,
+        roomName: room.name,
       },
-      sourceEventId: 'dev-seed:task-123:system-event:task-created',
+      sourceEventId: `dev-seed:${roomKey}:system-ready`,
     }),
     await upsertMessage(room, 2, {
-      senderUserId: users.manager.id,
+      senderUserId: users.artem.id,
       type: MessageType.TEXT,
-      body: 'Please check the task details before the daily sync.',
-      sourceEventId: 'dev-seed:task-123:message:manager-1',
+      body: `Artem started testing in ${room.name}.`,
+      sourceEventId: `dev-seed:${roomKey}:artem-1`,
     }),
     await upsertMessage(room, 3, {
-      senderUserId: users.employee.id,
+      senderUserId: users.tester.id,
       type: MessageType.TEXT,
-      body: 'I reviewed it and left the latest status here.',
-      sourceEventId: 'dev-seed:task-123:message:employee-1',
+      body: `Tester can read and reply in ${room.name}.`,
+      sourceEventId: `dev-seed:${roomKey}:tester-1`,
     }),
   ];
 
   const lastMessage = messages[messages.length - 1];
 
-  if (lastMessage !== undefined) {
-    await prisma.room.update({
-      where: {
-        id: room.id,
-      },
-      data: {
-        lastMessageId: lastMessage.id,
-        lastMessageAt: lastMessage.createdAt,
-      },
-    });
+  if (lastMessage === undefined) {
+    throw new Error('Expected seeded messages to exist.');
   }
+
+  await prisma.room.update({
+    where: {
+      id: room.id,
+    },
+    data: {
+      lastMessageId: lastMessage.id,
+      lastMessageAt: lastMessage.createdAt,
+    },
+  });
 
   return messages;
 };
 
-const upsertReadStates = async (room: Room, users: DevUsers, messages: Message[]): Promise<void> => {
-  const managerLastRead = messages[2];
-  const employeeLastRead = messages[1];
-
-  if (managerLastRead === undefined || employeeLastRead === undefined) {
-    throw new Error('Expected dev seed messages to exist.');
-  }
-
+const upsertReadState = async (
+  room: Room,
+  user: User,
+  message: Message,
+  unreadCountSnapshot: number,
+): Promise<void> => {
   await prisma.readState.upsert({
     where: {
       userId_roomId: {
-        userId: users.manager.id,
+        userId: user.id,
         roomId: room.id,
       },
     },
     create: {
       roomId: room.id,
-      userId: users.manager.id,
-      lastReadMessageId: managerLastRead.id,
-      lastReadSequence: managerLastRead.sequence,
+      userId: user.id,
+      lastReadMessageId: message.id,
+      lastReadSequence: message.sequence,
       lastReadAt: new Date(),
-      unreadCountSnapshot: 0,
+      unreadCountSnapshot,
     },
     update: {
-      lastReadMessageId: managerLastRead.id,
-      lastReadSequence: managerLastRead.sequence,
+      lastReadMessageId: message.id,
+      lastReadSequence: message.sequence,
       lastReadAt: new Date(),
-      unreadCountSnapshot: 0,
-    },
-  });
-
-  await prisma.readState.upsert({
-    where: {
-      userId_roomId: {
-        userId: users.employee.id,
-        roomId: room.id,
-      },
-    },
-    create: {
-      roomId: room.id,
-      userId: users.employee.id,
-      lastReadMessageId: employeeLastRead.id,
-      lastReadSequence: employeeLastRead.sequence,
-      lastReadAt: new Date(),
-      unreadCountSnapshot: 1,
-    },
-    update: {
-      lastReadMessageId: employeeLastRead.id,
-      lastReadSequence: employeeLastRead.sequence,
-      lastReadAt: new Date(),
-      unreadCountSnapshot: 1,
+      unreadCountSnapshot,
     },
   });
 };
 
-const upsertEmployeeNotification = async (
+const upsertReadStates = async (
   room: Room,
-  employee: User,
-  message: Message,
+  users: DevUsers,
+  messages: Message[],
 ): Promise<void> => {
-  const sourceEventId = 'dev-seed:task-123:notification:employee-1';
+  const artemReadMessage = messages[2];
+  const testerReadMessage = messages[1];
+
+  if (artemReadMessage === undefined || testerReadMessage === undefined) {
+    throw new Error('Expected seeded read-state messages to exist.');
+  }
+
+  await upsertReadState(room, users.artem, artemReadMessage, 0);
+  await upsertReadState(room, users.tester, testerReadMessage, 1);
+};
+
+const upsertNotification = async (data: {
+  user: User;
+  room: Room;
+  message: Message;
+  sourceEventId: string;
+  title: string;
+  body: string;
+}): Promise<void> => {
   const existingNotification = await prisma.notification.findFirst({
     where: {
-      userId: employee.id,
-      sourceEventId,
+      userId: data.user.id,
+      sourceEventId: data.sourceEventId,
     },
   });
 
-  const data = {
-    roomId: room.id,
-    messageId: message.id,
+  const notificationData = {
+    roomId: data.room.id,
+    messageId: data.message.id,
     type: 'message',
-    title: 'New task chat message',
-    body: 'Dev Manager posted a message in Dev Task Room.',
+    title: data.title,
+    body: data.body,
     priority: NotificationPriority.NORMAL,
     payload: {
-      taskId: devTaskId,
-      roomId: room.id,
+      roomId: data.room.id,
+      roomName: data.room.name,
     },
     deliveryState: NotificationDeliveryState.DELIVERED,
     readAt: null,
     deliveredAt: new Date(),
-    sourceEventId,
+    sourceEventId: data.sourceEventId,
   };
 
   if (existingNotification === null) {
     await prisma.notification.create({
       data: {
-        userId: employee.id,
-        ...data,
+        userId: data.user.id,
+        ...notificationData,
       },
     });
     return;
@@ -361,44 +385,52 @@ const upsertEmployeeNotification = async (
     where: {
       id: existingNotification.id,
     },
-    data,
+    data: notificationData,
   });
 };
 
-const printSummary = (users: DevUsers, room: Room): void => {
-  const baseUrl = 'http://localhost:4100';
-
+const printSummary = (users: DevUsers, rooms: Room[]): void => {
   console.log('Dev seed complete.');
   console.log('');
   console.log('Users:');
-  console.log(`manager:  ${users.manager.id}`);
-  console.log(`employee: ${users.employee.id}`);
-  console.log(`observer: ${users.observer.id}`);
+  console.log(`Artem:  ${users.artem.id}`);
+  console.log(`Tester: ${users.tester.id}`);
   console.log('');
-  console.log(`Room: ${room.id}`);
+  console.log('Rooms:');
+  rooms.forEach((room) => {
+    console.log(`${room.name}: ${room.id}`);
+  });
   console.log('');
-  console.log('Example curl commands:');
-  console.log(`curl -H "x-user-id: ${users.employee.id}" ${baseUrl}/rooms`);
-  console.log(`curl -H "x-user-id: ${users.employee.id}" ${baseUrl}/rooms/${room.id}/messages`);
-  console.log(`curl -H "x-user-id: ${users.employee.id}" "${baseUrl}/notifications?state=all"`);
+  console.log('Open the playground at /chat/ after deploy.');
 };
 
 const main = async (): Promise<void> => {
   const users = await upsertDevUsers();
-  const room = await upsertDevRoom(users.manager);
+  const rooms = await upsertRooms(users);
 
-  await upsertMemberships(room, users);
-  const messages = await upsertMessages(room, users);
-  await upsertReadStates(room, users, messages);
+  await upsertMemberships(rooms, users);
 
-  const managerMessage = messages[1];
+  for (const room of rooms) {
+    const messages = await seedRoomMessages(room, users);
+    await upsertReadStates(room, users, messages);
 
-  if (managerMessage === undefined) {
-    throw new Error('Expected manager seed message to exist.');
+    const artemMessage = messages[1];
+
+    if (artemMessage === undefined) {
+      throw new Error('Expected Artem seed message to exist.');
+    }
+
+    await upsertNotification({
+      user: users.tester,
+      room,
+      message: artemMessage,
+      sourceEventId: `dev-seed:${room.name ?? room.id}:notification:tester`,
+      title: `New message in ${room.name}`,
+      body: `Artem posted a message in ${room.name}.`,
+    });
   }
 
-  await upsertEmployeeNotification(room, users.employee, managerMessage);
-  printSummary(users, room);
+  printSummary(users, rooms);
 };
 
 try {

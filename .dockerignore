@@ -1,9 +1,12 @@
 node_modules
-dist
+dist/*
+!dist/frontend
+!dist/frontend/**
 coverage
 .git
 .env
 .env.local
 *.log
 chat-service.tar
+chat-service-playground.tar
 Data for connecting to the server.txt

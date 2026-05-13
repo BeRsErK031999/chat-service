@@ -17,12 +17,13 @@ COPY test ./test
 COPY eslint.config.js ./
 
 RUN yarn prisma:generate
-RUN yarn build
+RUN yarn build:server
 
 FROM node:20-alpine AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production
+LABEL app="chat-service"
 
 RUN apk add --no-cache openssl
 
