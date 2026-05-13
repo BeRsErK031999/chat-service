@@ -52,6 +52,7 @@ See [docs/http-api.md](docs/http-api.md) for the current HTTP endpoints.
 ```bash
 yarn install
 yarn prisma:generate
+yarn db:validate
 yarn type-check
 yarn lint
 yarn test
@@ -65,3 +66,10 @@ yarn dev
 ```
 
 Required environment variables are listed in `.env.example`.
+
+## Local PostgreSQL
+
+Local PostgreSQL for Prisma migrations and integration smoke tests is defined in
+`docker-compose.postgres.yml`.
+
+See [docs/local-postgres.md](docs/local-postgres.md) for startup, migration, integration test, and volume reset commands.

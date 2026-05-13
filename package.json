@@ -9,8 +9,13 @@
     "start": "node dist/server.js",
     "lint": "eslint .",
     "type-check": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --exclude test/integration/**",
+    "test:integration": "vitest run test/integration",
     "prisma:generate": "prisma generate",
+    "db:generate": "prisma generate",
+    "db:validate": "prisma validate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
     "format": "prettier --write ."
   },
   "dependencies": {
