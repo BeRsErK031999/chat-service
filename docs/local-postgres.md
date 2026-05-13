@@ -8,10 +8,13 @@ This project can run integration smoke tests against a local PostgreSQL containe
 docker compose -f docker-compose.postgres.yml up -d
 ```
 
+The container listens on PostgreSQL's internal port `5432`, but the host port is `55432` to avoid conflicts with a
+system PostgreSQL installed on `localhost:5432`.
+
 Connection string:
 
 ```text
-postgresql://postgres:postgres@localhost:5432/chat_service?schema=public
+postgresql://postgres:postgres@localhost:55432/chat_service?schema=public
 ```
 
 Copy `.env.local.example` to `.env.local` for local app settings if needed. The Prisma CLI still needs `DATABASE_URL` in the current shell or `.env`.
@@ -19,25 +22,25 @@ Copy `.env.local.example` to `.env.local` for local app settings if needed. The 
 ## Apply Migrations
 
 ```bash
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/chat_service?schema=public" yarn db:migrate --name init
+DATABASE_URL="postgresql://postgres:postgres@localhost:55432/chat_service?schema=public" yarn db:migrate --name init
 ```
 
 On Windows PowerShell:
 
 ```powershell
-$env:DATABASE_URL="postgresql://postgres:postgres@localhost:5432/chat_service?schema=public"; yarn db:migrate --name init
+$env:DATABASE_URL="postgresql://postgres:postgres@localhost:55432/chat_service?schema=public"; yarn db:migrate --name init
 ```
 
 ## Run Integration Smoke Test
 
 ```bash
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/chat_service?schema=public" yarn test:integration
+DATABASE_URL="postgresql://postgres:postgres@localhost:55432/chat_service?schema=public" yarn test:integration
 ```
 
 On Windows PowerShell:
 
 ```powershell
-$env:DATABASE_URL="postgresql://postgres:postgres@localhost:5432/chat_service?schema=public"; yarn test:integration
+$env:DATABASE_URL="postgresql://postgres:postgres@localhost:55432/chat_service?schema=public"; yarn test:integration
 ```
 
 The regular `yarn test` command does not require PostgreSQL.
@@ -52,6 +55,5 @@ docker compose -f docker-compose.postgres.yml down -v
 
 ## Troubleshooting
 
-The compose file publishes PostgreSQL on host port `5432`. If another local PostgreSQL process already owns that
-port, Prisma commands using `localhost:5432` may connect to the wrong server and fail authentication. Stop the
-conflicting local PostgreSQL process or adjust your local environment before running migrations and integration tests.
+The compose file publishes PostgreSQL on host port `55432` because `5432` is often owned by a system PostgreSQL
+installation. If you still see authentication errors, confirm `DATABASE_URL` points to `localhost:55432`.
