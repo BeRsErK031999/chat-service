@@ -73,3 +73,10 @@ Local PostgreSQL for Prisma migrations and integration smoke tests is defined in
 `docker-compose.postgres.yml`.
 
 See [docs/local-postgres.md](docs/local-postgres.md) for startup, migration, integration test, and volume reset commands.
+
+## Dev Seed
+
+Use `yarn db:seed` with a local `DATABASE_URL` to create stable users, a task room, messages, read states, and a
+notification for manual HTTP API checks.
+
+See [docs/dev-seed.md](docs/dev-seed.md) for commands and example curl requests.
