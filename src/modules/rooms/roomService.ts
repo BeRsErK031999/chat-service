@@ -1,7 +1,25 @@
+import { TaskRoomKind } from '@prisma/client';
 import type { Message, Prisma, PrismaClient, ReadState, Room, RoomMember } from '@prisma/client';
 
 import { addRoomMemberInputSchema, createRoomInputSchema } from './roomTypes.js';
 import type { AddRoomMemberInput, CreateRoomInput } from './roomTypes.js';
+import { NotFoundError } from '../../shared/errors.js';
+
+export type TaskRoomScope = 'internal' | 'manager' | 'customer' | 'system-events';
+
+export type TaskRoomLookupResult = {
+  roomId: string;
+  taskId: string;
+  roomScope: TaskRoomScope;
+  roomName: string;
+};
+
+const taskRoomKindByScope: Record<TaskRoomScope, TaskRoomKind> = {
+  internal: TaskRoomKind.INTERNAL,
+  manager: TaskRoomKind.MANAGER,
+  customer: TaskRoomKind.CUSTOMER,
+  'system-events': TaskRoomKind.SYSTEM_EVENTS,
+};
 
 export const createRoom = async (prisma: PrismaClient, input: CreateRoomInput): Promise<Room> => {
   const data = createRoomInputSchema.parse(input);
@@ -137,4 +155,49 @@ export const listRoomsForUser = async (
       };
     }),
   );
+};
+
+export const lookupTaskRoomForUser = async (
+  prisma: PrismaClient,
+  input: {
+    userId: string;
+    taskId: string;
+    roomScope: TaskRoomScope;
+  },
+): Promise<TaskRoomLookupResult> => {
+  const link = await prisma.taskRoomLink.findFirst({
+    where: {
+      taskId: input.taskId,
+      kind: taskRoomKindByScope[input.roomScope],
+      room: {
+        isArchived: false,
+        members: {
+          some: {
+            userId: input.userId,
+            leftAt: null,
+          },
+        },
+      },
+    },
+    select: {
+      taskId: true,
+      room: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
+
+  if (link === null) {
+    throw new NotFoundError('Task room was not found.');
+  }
+
+  return {
+    roomId: link.room.id,
+    taskId: link.taskId,
+    roomScope: input.roomScope,
+    roomName: link.room.name ?? link.room.id,
+  };
 };

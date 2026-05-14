@@ -1,6 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import type { PrismaClient } from '@prisma/client';
 
+import { publishNotificationRead } from '../events/eventPublisher.js';
+import { sseConnectionManager } from '../events/sseConnectionManager.js';
+import type { SseConnectionManager } from '../events/sseConnectionManager.js';
 import { getAuthenticatedUser, requireDevAuth } from '../../shared/auth/devAuth.js';
 import {
   listNotificationsForUser,
@@ -14,6 +17,7 @@ import {
 export const registerNotificationRoutes = (
   app: FastifyInstance,
   prisma: PrismaClient,
+  eventManager: SseConnectionManager = sseConnectionManager,
 ): void => {
   app.get('/notifications', { preHandler: requireDevAuth }, async (request) => {
     const user = getAuthenticatedUser(request);
@@ -26,6 +30,9 @@ export const registerNotificationRoutes = (
     const user = getAuthenticatedUser(request);
     const params = notificationIdParamsSchema.parse(request.params);
 
-    return markNotificationRead(prisma, params.id, user.id);
+    const notification = await markNotificationRead(prisma, params.id, user.id);
+    publishNotificationRead(notification, eventManager);
+
+    return notification;
   });
 };

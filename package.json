@@ -19,6 +19,7 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx scripts/seed-dev.ts",
     "dev:seed": "tsx scripts/seed-dev.ts",
+    "dev:seed:server": "node dist/scripts/seed-dev.js",
     "db:studio": "prisma studio",
     "deploy:server": "powershell -ExecutionPolicy Bypass -File scripts/deploy-server.ps1",
     "deploy:migrate:server": "powershell -ExecutionPolicy Bypass -File scripts/migrate-server.ps1",

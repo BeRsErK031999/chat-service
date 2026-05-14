@@ -5,85 +5,230 @@ param(
 $ErrorActionPreference = "Stop"
 
 $ProjectName = "chat-service"
-$BackendImageName = "chat-service:latest"
-$FrontendImageName = "chat-service-playground:latest"
-$BackendTarName = "chat-service.tar"
-$FrontendTarName = "chat-service-playground.tar"
+$BackendImage = "chat-service:latest"
+$FrontendImage = "chat-service-playground:latest"
 $ServerUser = "admin_devops"
 $ServerHost = "192.168.22.37"
 $Server = "$ServerUser@$ServerHost"
-$ServerImagesDir = "/opt/apps/images"
-$ServerProjectDir = "/opt/apps/projects/$ProjectName"
-$ServerBackendTarPath = "$ServerImagesDir/$BackendTarName"
-$ServerFrontendTarPath = "$ServerImagesDir/$FrontendTarName"
+$ServerRootDir = "/opt/apps"
+$ServerProjectDir = "$ServerRootDir/projects/$ProjectName"
+$ServerImagesDir = "$ServerRootDir/images"
+$ServerNginxIncludeDir = "$ServerRootDir/nginx/conf.d"
+$BackendTarName = "chat-service.tar"
+$FrontendTarName = "chat-service-playground.tar"
+$LocalImageDir = Join-Path ([System.IO.Path]::GetTempPath()) "$ProjectName-deploy-images"
+$LocalBackendTar = Join-Path $LocalImageDir $BackendTarName
+$LocalFrontendTar = Join-Path $LocalImageDir $FrontendTarName
+$UsePasswordTransport = -not [string]::IsNullOrWhiteSpace($env:CHAT_SERVICE_DEPLOY_PASSWORD)
 
-Write-Host "Running local checks..."
-yarn prisma:generate
-yarn type-check
-yarn lint
-yarn test
-yarn build
+function Invoke-PasswordRemote {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Command
+  )
 
-Write-Host "Building Docker image $BackendImageName..."
-docker build -t $BackendImageName .
+  $env:CHAT_SERVICE_DEPLOY_HOST = $ServerHost
+  $env:CHAT_SERVICE_DEPLOY_USER = $ServerUser
+  $env:CHAT_SERVICE_REMOTE_COMMAND = $Command
 
-Write-Host "Building Docker image $FrontendImageName..."
-$PreviousDockerBuildkit = $env:DOCKER_BUILDKIT
-$env:DOCKER_BUILDKIT = "0"
-try {
-  docker build -f Dockerfile.frontend -t $FrontendImageName .
-} finally {
-  $env:DOCKER_BUILDKIT = $PreviousDockerBuildkit
+  try {
+    python -c @'
+import os
+import sys
+import paramiko
+
+client = paramiko.SSHClient()
+client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+client.connect(
+    os.environ['CHAT_SERVICE_DEPLOY_HOST'],
+    username=os.environ['CHAT_SERVICE_DEPLOY_USER'],
+    password=os.environ['CHAT_SERVICE_DEPLOY_PASSWORD'],
+    look_for_keys=False,
+    allow_agent=False,
+    timeout=30,
+)
+stdin, stdout, stderr = client.exec_command(os.environ['CHAT_SERVICE_REMOTE_COMMAND'])
+sys.stdout.buffer.write(stdout.read())
+sys.stdout.buffer.flush()
+sys.stderr.buffer.write(stderr.read())
+sys.stderr.buffer.flush()
+exit_code = stdout.channel.recv_exit_status()
+client.close()
+sys.exit(exit_code)
+'@
+    if ($LASTEXITCODE -ne 0) {
+      throw "Remote command failed with exit code $LASTEXITCODE"
+    }
+  } finally {
+    Remove-Item Env:\CHAT_SERVICE_DEPLOY_HOST -ErrorAction SilentlyContinue
+    Remove-Item Env:\CHAT_SERVICE_DEPLOY_USER -ErrorAction SilentlyContinue
+    Remove-Item Env:\CHAT_SERVICE_REMOTE_COMMAND -ErrorAction SilentlyContinue
+  }
 }
 
-Write-Host "Saving Docker image to $BackendTarName..."
-if (Test-Path $BackendTarName) {
-  Remove-Item -LiteralPath $BackendTarName
+function Copy-PasswordToServer {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Source,
+    [Parameter(Mandatory = $true)]
+    [string]$Destination
+  )
+
+  $env:CHAT_SERVICE_DEPLOY_HOST = $ServerHost
+  $env:CHAT_SERVICE_DEPLOY_USER = $ServerUser
+  $env:CHAT_SERVICE_LOCAL_SOURCE = (Resolve-Path -LiteralPath $Source).Path
+  $env:CHAT_SERVICE_REMOTE_DESTINATION = $Destination
+
+  try {
+    python -c @'
+import os
+import sys
+import paramiko
+
+transport = paramiko.Transport((os.environ['CHAT_SERVICE_DEPLOY_HOST'], 22))
+transport.connect(
+    username=os.environ['CHAT_SERVICE_DEPLOY_USER'],
+    password=os.environ['CHAT_SERVICE_DEPLOY_PASSWORD'],
+)
+sftp = paramiko.SFTPClient.from_transport(transport)
+sftp.put(os.environ['CHAT_SERVICE_LOCAL_SOURCE'], os.environ['CHAT_SERVICE_REMOTE_DESTINATION'])
+sftp.close()
+transport.close()
+sys.exit(0)
+'@
+    if ($LASTEXITCODE -ne 0) {
+      throw "SFTP upload failed with exit code $LASTEXITCODE"
+    }
+  } finally {
+    Remove-Item Env:\CHAT_SERVICE_DEPLOY_HOST -ErrorAction SilentlyContinue
+    Remove-Item Env:\CHAT_SERVICE_DEPLOY_USER -ErrorAction SilentlyContinue
+    Remove-Item Env:\CHAT_SERVICE_LOCAL_SOURCE -ErrorAction SilentlyContinue
+    Remove-Item Env:\CHAT_SERVICE_REMOTE_DESTINATION -ErrorAction SilentlyContinue
+  }
 }
-docker save $BackendImageName -o $BackendTarName
 
-Write-Host "Saving Docker image to $FrontendTarName..."
-if (Test-Path $FrontendTarName) {
-  Remove-Item -LiteralPath $FrontendTarName
+function Invoke-Remote {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Command
+  )
+
+  if ($UsePasswordTransport) {
+    Invoke-PasswordRemote $Command
+    return
+  }
+
+  ssh $Server $Command
 }
-docker save $FrontendImageName -o $FrontendTarName
 
-Write-Host "Ensuring server project directory exists..."
-ssh $Server "mkdir -p $ServerImagesDir $ServerProjectDir"
+function Copy-ToServer {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Source,
+    [Parameter(Mandatory = $true)]
+    [string]$Destination
+  )
 
-Write-Host "Uploading images and compose template..."
-scp ".\$BackendTarName" "${Server}:${ServerImagesDir}/"
-scp ".\$FrontendTarName" "${Server}:${ServerImagesDir}/"
-scp "deploy/docker-compose.server.yml" "${Server}:${ServerProjectDir}/docker-compose.yml"
+  if ($UsePasswordTransport) {
+    Copy-PasswordToServer $Source $Destination
+    return
+  }
 
-Write-Host ""
-Write-Host "Reminder: create or update ${ServerProjectDir}/.env on the server before first deploy."
-Write-Host "Use deploy/.env.server.example as the template and do not commit real secrets."
-Write-Host ""
+  scp $Source "${Server}:$Destination"
+}
 
-Write-Host "Loading images and deploying project..."
-ssh $Server "cd /opt/apps && ./scripts/load-image.sh $ServerBackendTarPath && ./scripts/load-image.sh $ServerFrontendTarPath && ./scripts/deploy-project.sh $ProjectName"
+if (-not (Test-Path -LiteralPath "Dockerfile" -PathType Leaf)) {
+  throw "Missing backend Dockerfile."
+}
 
-Write-Host "Checking deployed containers and health endpoints..."
-ssh $Server "docker ps --filter name=$ProjectName && curl -f http://127.0.0.1:4100/health && curl -f http://127.0.0.1:4101/"
+if (-not (Test-Path -LiteralPath "Dockerfile.frontend" -PathType Leaf)) {
+  throw "Missing frontend Dockerfile.frontend."
+}
+
+if (-not (Test-Path -LiteralPath "deploy/docker-compose.server.yml" -PathType Leaf)) {
+  throw "Missing deploy/docker-compose.server.yml."
+}
+
+if (-not (Test-Path -LiteralPath "deploy/nginx.chat-service.conf" -PathType Leaf)) {
+  throw "Missing deploy/nginx.chat-service.conf."
+}
+
+New-Item -ItemType Directory -Force -Path $LocalImageDir | Out-Null
+
+if ($UsePasswordTransport) {
+  Write-Host "Using password-based SSH transport from CHAT_SERVICE_DEPLOY_PASSWORD."
+} else {
+  Write-Host "Using system ssh/scp transport."
+}
+
+Write-Host "Building backend image $BackendImage..."
+docker build -t $BackendImage -f Dockerfile .
+
+Write-Host "Building frontend image $FrontendImage..."
+docker build -t $FrontendImage -f Dockerfile.frontend .
+
+Write-Host "Saving images locally..."
+docker save -o $LocalBackendTar $BackendImage
+docker save -o $LocalFrontendTar $FrontendImage
+
+Write-Host "Preparing server directories..."
+Invoke-Remote "mkdir -p $ServerImagesDir $ServerProjectDir"
+
+Write-Host "Uploading image tarballs..."
+Copy-ToServer $LocalBackendTar "$ServerImagesDir/$BackendTarName"
+Copy-ToServer $LocalFrontendTar "$ServerImagesDir/$FrontendTarName"
+
+Write-Host "Uploading docker compose file..."
+Copy-ToServer "deploy/docker-compose.server.yml" "$ServerProjectDir/docker-compose.yml"
+
+Write-Host "Uploading nginx include config..."
+Copy-ToServer "deploy/nginx.chat-service.conf" "$ServerProjectDir/nginx.chat-service.conf"
+Invoke-Remote "if [ -d '$ServerNginxIncludeDir' ]; then cp '$ServerProjectDir/nginx.chat-service.conf' '$ServerNginxIncludeDir/chat-service.conf'; fi"
+
+Write-Host "Verifying server-side .env exists; deploy does not upload secrets..."
+Invoke-Remote "test -f $ServerProjectDir/.env"
+
+Write-Host "Loading Docker images on server..."
+Invoke-Remote "docker load -i $ServerImagesDir/$BackendTarName && docker load -i $ServerImagesDir/$FrontendTarName"
+
+Write-Host "Starting compose project without running migrations..."
+Invoke-Remote "cd $ServerProjectDir && docker compose up -d"
+
+Write-Host "Checking compose project status..."
+Invoke-Remote "cd $ServerProjectDir && docker compose ps"
+
+Write-Host "Checking backend health endpoint..."
+Invoke-Remote "curl -fsS http://127.0.0.1:4100/health"
+
+Write-Host "Checking frontend endpoint..."
+Invoke-Remote "curl -fsS http://127.0.0.1:4101/ >/dev/null"
 
 if ($SkipCleanup) {
-  Write-Host "Skipping server Docker artifact cleanup because -SkipCleanup was provided."
+  Write-Host "Skipping server cleanup because -SkipCleanup was provided."
 } else {
-  Write-Host "Server disk usage before cleanup..."
-  ssh $Server "df -h / /opt/apps || df -h"
+  Write-Host "Server disk usage before cleanup:"
+  Invoke-Remote "df -h $ServerRootDir || df -h"
 
-  Write-Host "Server chat-service images before cleanup..."
-  ssh $Server "docker images chat-service && docker images chat-service-playground"
+  Write-Host "Server chat-service images before cleanup:"
+  Invoke-Remote "docker images chat-service"
 
-  Write-Host "Cleaning up uploaded tar and dangling Docker images..."
-  ssh $Server "rm -f $ServerBackendTarPath $ServerFrontendTarPath && docker image prune -f --filter label=app=$ProjectName"
+  Write-Host "Server chat-service-playground images before cleanup:"
+  Invoke-Remote "docker images chat-service-playground"
 
-  Write-Host "Server disk usage after cleanup..."
-  ssh $Server "df -h / /opt/apps || df -h"
+  Write-Host "Removing uploaded tarballs and pruning dangling Docker images..."
+  Invoke-Remote "rm -f $ServerImagesDir/$BackendTarName $ServerImagesDir/$FrontendTarName && docker image prune -f"
 
-  Write-Host "Server chat-service images after cleanup..."
-  ssh $Server "docker images chat-service && docker images chat-service-playground"
+  Write-Host "Server disk usage after cleanup:"
+  Invoke-Remote "df -h $ServerRootDir || df -h"
+
+  Write-Host "Server chat-service images after cleanup:"
+  Invoke-Remote "docker images chat-service"
+
+  Write-Host "Server chat-service-playground images after cleanup:"
+  Invoke-Remote "docker images chat-service-playground"
 }
 
-Write-Host "Deploy complete."
+Write-Host "Cleaning local temporary image tarballs..."
+Remove-Item -LiteralPath $LocalBackendTar, $LocalFrontendTar -Force -ErrorAction SilentlyContinue
+
+Write-Host "Server deploy complete."

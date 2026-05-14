@@ -1,109 +1,90 @@
 # Server Deploy
 
-`chat-service` deploys to the local Docker platform on the Ubuntu server. There is no registry, CI workflow,
-Kubernetes, or direct public Docker port exposure in this phase.
+`chat-service` deploys from the Windows workstation to the Ubuntu Docker host. There is no registry, CI deploy,
+Kubernetes, or public Docker port exposure in this phase.
 
-## Architecture
+## Server Layout
 
-- Build the Docker image locally on Windows.
-- Build the frontend playground image locally on Windows.
-- Save the images as `chat-service.tar` and `chat-service-playground.tar`.
-- Upload the image tarballs to `/opt/apps/images`.
-- Upload the project compose file to `/opt/apps/projects/chat-service/docker-compose.yml`.
-- Load and deploy through the existing server scripts in `/opt/apps/scripts`.
-- The backend container publishes only `127.0.0.1:4100:4100`.
-- The frontend playground container publishes only `127.0.0.1:4101:80`.
-- Nginx proxies public HTTP/HTTPS traffic to `http://127.0.0.1:4100`.
-- Nginx proxies `/chat/` to the frontend playground and `/chat/api/` to the backend.
+- SSH: `admin_devops@192.168.22.37`
+- Project: `/opt/apps/projects/chat-service`
+- Uploaded images: `/opt/apps/images`
+- Backend: `127.0.0.1:4100`
+- Frontend playground: `127.0.0.1:4101`
+- PostgreSQL host maintenance port: `127.0.0.1:55432`
 
-## Workflow
+Nginx exposes:
 
-After pushing `main`, deploy from the local Windows workstation:
+- `/chat/` -> frontend playground
+- `/chat/api/` -> backend
+- `/chat/api/events` -> backend SSE with buffering disabled
+
+## Standard Workflow
+
+Deploy application containers:
 
 ```powershell
 yarn deploy:server
 ```
 
-The script runs local checks, builds `chat-service:latest` and `chat-service-playground:latest`, saves both image
-tarballs, uploads them with `scp`, and then runs:
-
-```bash
-cd /opt/apps
-./scripts/load-image.sh /opt/apps/images/chat-service.tar
-./scripts/load-image.sh /opt/apps/images/chat-service-playground.tar
-./scripts/deploy-project.sh chat-service
-```
-
-`yarn deploy:server` updates only the Docker image and container. It intentionally does not apply Prisma
-migrations.
-
-After the first deploy, and after any deploy that includes new Prisma migrations, run the separate migration command:
+Apply Prisma migrations only when there are new migrations:
 
 ```powershell
 yarn deploy:migrate:server
 ```
 
-## Server Cleanup
-
-After a successful deploy and health check, `scripts/deploy-server.ps1` performs a narrow cleanup on the server:
-
-```bash
-rm -f /opt/apps/images/chat-service.tar
-rm -f /opt/apps/images/chat-service-playground.tar
-docker image prune -f --filter label=app=chat-service
-docker images chat-service
-docker images chat-service-playground
-```
-
-The script logs disk usage and `chat-service` / `chat-service-playground` images before and after cleanup.
-
-Cleanup removes the uploaded `chat-service.tar`, `chat-service-playground.tar`, and dangling Docker images with the
-`app=chat-service` label only. It does not remove Docker volumes, running containers, `/opt/apps/projects`,
-`/opt/apps/backups`, or tagged images for other projects. The deploy script does not run `docker system prune` or
-`docker volume prune`.
-
-To keep the uploaded tarball and skip image pruning for a deploy:
+Refresh dev test data when needed:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/deploy-server.ps1 -SkipCleanup
+yarn dev:seed
 ```
 
-## Required Server `.env`
+For server-side seed after deploy:
 
-Create this file manually on the server:
+```bash
+cd /opt/apps/projects/chat-service
+docker compose run --rm app yarn dev:seed:server
+```
+
+`yarn deploy:server` intentionally does not run Prisma migrations. Deploy and migration are separate operations so image
+rollout and data-model changes can be reviewed independently.
+
+## Deploy Script
+
+`scripts/deploy-server.ps1` runs from Windows PowerShell. It:
+
+- builds `chat-service:latest` from `Dockerfile`
+- builds `chat-service-playground:latest` from `Dockerfile.frontend`
+- saves local image tarballs in a temporary directory
+- uploads them to:
+  - `/opt/apps/images/chat-service.tar`
+  - `/opt/apps/images/chat-service-playground.tar`
+- uploads `deploy/docker-compose.server.yml` to `/opt/apps/projects/chat-service/docker-compose.yml`
+- uploads `deploy/nginx.chat-service.conf` to the project directory and copies it to `/opt/apps/nginx/conf.d/chat-service.conf` when that include directory exists
+- does not upload `.env`
+- runs `docker load`
+- runs `docker compose up -d`
+- runs `docker compose ps`
+- checks `http://127.0.0.1:4100/health`
+- checks `http://127.0.0.1:4101/`
+
+The script requires the server-side `.env` to already exist:
 
 ```text
 /opt/apps/projects/chat-service/.env
 ```
 
-Use `deploy/.env.server.example` as the template:
+Use `deploy/.env.server.example` as a template and never commit real server secrets.
 
-```env
-PORT=4100
-LOG_LEVEL=info
-DATABASE_URL=<server-postgres-url>
-AUTH_MODE=standalone
-```
+## Migration Script
 
-Do not commit real server secrets.
+`scripts/migrate-server.ps1` is separate from deploy. It:
 
-## Database
-
-The deploy script does not apply Prisma migrations on the server. Apply migrations manually with:
-
-```powershell
-yarn deploy:migrate:server
-```
-
-The migration script verifies that local `prisma/migrations` exists, uploads only `prisma/schema.prisma` and
-`prisma/migrations` to:
-
-```text
-/opt/apps/projects/chat-service/prisma
-```
-
-It does not upload `.env` files. On the server it uses the existing project `.env` through `docker-compose.yml` and
-runs:
+- verifies `prisma/schema.prisma` exists locally
+- verifies `prisma/migrations` exists locally and contains migration directories
+- uploads only `schema.prisma` and `prisma/migrations`
+- does not upload `.env`
+- uses the server-side `.env` through compose `env_file`
+- runs:
 
 ```bash
 cd /opt/apps/projects/chat-service
@@ -111,65 +92,71 @@ docker compose run --rm app yarn prisma migrate deploy
 docker compose ps
 ```
 
-Use this command after the first deploy and whenever the deployed image expects database changes from new Prisma
-migrations.
+Run it after the first deploy and whenever the deployed image expects database changes from new Prisma migrations.
+
+## Cleanup
+
+After a successful deploy and health checks, cleanup runs unless `-SkipCleanup` is provided:
+
+```bash
+rm -f /opt/apps/images/chat-service.tar
+rm -f /opt/apps/images/chat-service-playground.tar
+docker image prune -f
+```
+
+The deploy script logs:
+
+- disk usage before cleanup
+- disk usage after cleanup
+- `docker images chat-service` before and after cleanup
+- `docker images chat-service-playground` before and after cleanup
+
+Cleanup does not run:
+
+- `docker system prune`
+- `docker system prune -a`
+- `docker volume prune`
+- deletion of `/opt/apps/projects`
+- deletion of `/opt/apps/backups`
+
+To keep uploaded tarballs and skip Docker image pruning:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/deploy-server.ps1 -SkipCleanup
+```
+
+Rollback warning: cleanup removes uploaded tarballs and dangling images, which can make a quick image rollback harder
+unless known-good tarballs are stored elsewhere.
+
+## Docker Compose
+
+`deploy/docker-compose.server.yml` defines:
+
+- `postgres` using `postgres:16-alpine`, bound to `127.0.0.1:55432:5432`
+- `app` using `chat-service:latest`, bound to `127.0.0.1:4100:4100`, with `env_file: .env`
+- `frontend` using `chat-service-playground:latest`, bound to `127.0.0.1:4101:80`
+
+The `app` service does not run migrations automatically.
 
 ## Nginx
 
-Copy or adapt `deploy/nginx.chat-service.conf` into:
+`deploy/nginx.chat-service.conf` is a location-only include for the existing server block. Do not convert it into a full
+`server {}` config unless the host nginx layout changes.
 
-```text
-/opt/apps/nginx/conf.d/chat-service.conf
+The SSE location `/chat/api/events` must keep:
+
+```nginx
+proxy_http_version 1.1;
+proxy_buffering off;
+proxy_read_timeout 1h;
 ```
 
-Set `server_name` to the real domain when one exists. The template proxies to:
+Reload Nginx with the server's established workflow after validating the host config.
 
-```text
-http://127.0.0.1:4100
-```
+## Rollback Notes
 
-It also exposes the manual playground at:
+Image rollback does not roll back database migrations. Treat Prisma migration rollback as a separate data-model change
+that needs explicit review.
 
-```text
-http://192.168.22.37/chat/
-```
-
-and proxies playground API calls from `/chat/api/` to the backend.
-
-Reload Nginx using the server's established workflow after validating the config. Do not edit the global
-`nginx.conf` for this service.
-
-## Health Check
-
-The deploy script checks:
-
-```bash
-docker ps --filter name=chat-service
-curl -f http://127.0.0.1:4100/health
-curl -f http://127.0.0.1:4101/
-```
-
-For logs:
-
-```bash
-cd /opt/apps
-./scripts/logs-project.sh chat-service
-```
-
-## Rollback Basics
-
-This phase uses local image tarballs instead of a registry. To roll back, load a previously saved image tarball and
-redeploy:
-
-```bash
-cd /opt/apps
-./scripts/load-image.sh /opt/apps/images/<previous-chat-service-image>.tar
-./scripts/deploy-project.sh chat-service
-```
-
-Keep known-good image tarballs under `/opt/apps/images` or restore them from backups before deploying. If deploy
-cleanup removed old image tarballs or dangling images, fast rollback to an older image may not be available until the
-older image is restored or rebuilt.
-
-Rolling back the image does not automatically roll back database migrations. Treat Prisma migration rollback as a
-separate data-model operation and review it before applying any database changes.
+Because this phase uses local tarballs rather than a registry, keep known-good image tarballs outside cleanup scope when
+fast rollback matters.

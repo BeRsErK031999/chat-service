@@ -78,6 +78,10 @@ enum NotificationDeliveryState {
   SUPPRESSED
 }
 
+enum RequestIdempotencyStatus {
+  COMPLETED
+}
+
 model User {
   id             String         @id @default(uuid()) @db.Uuid
   externalUserId String?        @unique
@@ -96,6 +100,7 @@ model User {
   sentMessages  Message[]      @relation("MessageSender")
   readStates    ReadState[]
   notifications Notification[]
+  idempotencyRecords RequestIdempotencyRecord[]
 
   @@index([status])
 }
@@ -122,6 +127,7 @@ model Room {
   messages      Message[]
   readStates    ReadState[]
   notifications Notification[]
+  idempotencyRecords RequestIdempotencyRecord[]
   taskRoomLinks TaskRoomLink[]
 
   @@index([type])
@@ -169,6 +175,7 @@ model Message {
   sender        User?          @relation("MessageSender", fields: [senderUserId], references: [id], onDelete: SetNull)
   readStates    ReadState[]    @relation("LastReadMessage")
   notifications Notification[]
+  idempotencyRecords RequestIdempotencyRecord[]
 
   @@unique([roomId, sequence])
   @@index([roomId, createdAt])
@@ -235,4 +242,26 @@ model TaskRoomLink {
 
   @@unique([taskId, kind])
   @@index([projectId])
+}
+
+model RequestIdempotencyRecord {
+  id              String                   @id @default(uuid()) @db.Uuid
+  scope           String
+  key             String
+  requestHash     String
+  status          RequestIdempotencyStatus @default(COMPLETED)
+  userId          String                   @db.Uuid
+  roomId          String                   @db.Uuid
+  resultMessageId String                   @db.Uuid
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room          Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  resultMessage Message @relation(fields: [resultMessageId], references: [id], onDelete: Cascade)
+
+  @@unique([scope, key])
+  @@index([userId, createdAt])
+  @@index([roomId, createdAt])
+  @@index([resultMessageId])
 }

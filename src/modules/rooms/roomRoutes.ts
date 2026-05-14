@@ -2,23 +2,51 @@ import { MessageType } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
 import type { PrismaClient } from '@prisma/client';
 
-import { createMessage, listRoomMessages } from '../messages/messageService.js';
+import {
+  publishMessageCreated,
+  publishNotificationCreated,
+  publishRoomRead,
+} from '../events/eventPublisher.js';
+import { sseConnectionManager } from '../events/sseConnectionManager.js';
+import type { SseConnectionManager } from '../events/sseConnectionManager.js';
+import {
+  createMessageWithNotifications,
+  createMessageWithNotificationsIdempotent,
+  listRoomMessages,
+} from '../messages/messageService.js';
 import { markRoomRead } from '../read-states/readStateService.js';
 import { getAuthenticatedUser, requireDevAuth } from '../../shared/auth/devAuth.js';
 import { canReadRoom, canWriteRoom } from './roomPermissions.js';
-import { listRoomsForUser } from './roomService.js';
+import { listRoomsForUser, lookupTaskRoomForUser } from './roomService.js';
 import {
+  idempotencyKeyHeaderSchema,
   markRoomReadBodySchema,
   postRoomMessageBodySchema,
   roomIdParamsSchema,
   roomMessagesQuerySchema,
+  taskRoomLookupQuerySchema,
 } from './roomSchemas.js';
 
-export const registerRoomRoutes = (app: FastifyInstance, prisma: PrismaClient): void => {
+export const registerRoomRoutes = (
+  app: FastifyInstance,
+  prisma: PrismaClient,
+  eventManager: SseConnectionManager = sseConnectionManager,
+): void => {
   app.get('/rooms', { preHandler: requireDevAuth }, async (request) => {
     const user = getAuthenticatedUser(request);
 
     return listRoomsForUser(prisma, user.id);
+  });
+
+  app.get('/task-rooms/lookup', { preHandler: requireDevAuth }, async (request) => {
+    const user = getAuthenticatedUser(request);
+    const query = taskRoomLookupQuerySchema.parse(request.query);
+
+    return lookupTaskRoomForUser(prisma, {
+      userId: user.id,
+      taskId: query.taskId,
+      roomScope: query.roomScope,
+    });
   });
 
   app.get('/rooms/:roomId/messages', { preHandler: requireDevAuth }, async (request) => {
@@ -47,16 +75,33 @@ export const registerRoomRoutes = (app: FastifyInstance, prisma: PrismaClient): 
     const user = getAuthenticatedUser(request);
     const params = roomIdParamsSchema.parse(request.params);
     const body = postRoomMessageBodySchema.parse(request.body);
+    const idempotencyKey = idempotencyKeyHeaderSchema.parse(
+      request.headers['idempotency-key'],
+    );
 
     await canWriteRoom(prisma, params.roomId, user.id);
 
-    return createMessage(prisma, {
+    const input = {
       roomId: params.roomId,
       senderUserId: user.id,
       type: MessageType.TEXT,
       body: body.body,
       eventPayload: {},
-    });
+    };
+
+    const result =
+      idempotencyKey !== undefined
+        ? await createMessageWithNotificationsIdempotent(prisma, input, idempotencyKey)
+        : await createMessageWithNotifications(prisma, input);
+
+    if (result.created) {
+      await publishMessageCreated(prisma, result.message, eventManager);
+      for (const notification of result.notifications) {
+        publishNotificationCreated(notification, eventManager);
+      }
+    }
+
+    return result.message;
   });
 
   app.post('/rooms/:roomId/read', { preHandler: requireDevAuth }, async (request) => {
@@ -66,10 +111,14 @@ export const registerRoomRoutes = (app: FastifyInstance, prisma: PrismaClient): 
 
     await canReadRoom(prisma, params.roomId, user.id);
 
-    return markRoomRead(prisma, {
+    const readState = await markRoomRead(prisma, {
       roomId: params.roomId,
       userId: user.id,
       lastReadSequence: body.lastReadSequence,
     });
+
+    publishRoomRead(readState, eventManager);
+
+    return readState;
   });
 };

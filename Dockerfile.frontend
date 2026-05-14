@@ -1,8 +1,19 @@
-FROM nginx:1.27-alpine
+FROM node:20-alpine AS builder
 
+WORKDIR /app
+LABEL app="chat-service"
+
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
+
+COPY tsconfig.web.json vite.config.ts ./
+COPY frontend ./frontend
+RUN yarn build:web
+
+FROM nginx:1.27-alpine
 LABEL app="chat-service"
 
 COPY deploy/nginx.frontend.conf /etc/nginx/conf.d/default.conf
-COPY dist/frontend /usr/share/nginx/html
+COPY --from=builder /app/dist/frontend/ /usr/share/nginx/html/
 
 EXPOSE 80

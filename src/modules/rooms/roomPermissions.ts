@@ -1,9 +1,9 @@
 import type { PrismaClient, Room } from '@prisma/client';
 
 import { canRoomAcceptUserMessages } from './roomTypes.js';
-import { ForbiddenError } from '../../shared/errors.js';
+import { ForbiddenError, NotFoundError } from '../../shared/errors.js';
 
-export const assertRoomMember = async (
+export const assertActiveRoomMember = async (
   prisma: PrismaClient,
   roomId: string,
   userId: string,
@@ -20,7 +20,7 @@ export const assertRoomMember = async (
   });
 
   if (membership === null) {
-    throw new ForbiddenError('User is not a room member.');
+    throw new NotFoundError('Room was not found.');
   }
 };
 
@@ -29,7 +29,7 @@ export const canReadRoom = async (
   roomId: string,
   userId: string,
 ): Promise<void> => {
-  await assertRoomMember(prisma, roomId, userId);
+  await assertActiveRoomMember(prisma, roomId, userId);
 };
 
 export const canWriteRoom = async (
@@ -37,7 +37,7 @@ export const canWriteRoom = async (
   roomId: string,
   userId: string,
 ): Promise<Pick<Room, 'type' | 'taskRoomKind' | 'isArchived'>> => {
-  await assertRoomMember(prisma, roomId, userId);
+  await assertActiveRoomMember(prisma, roomId, userId);
 
   const room = await prisma.room.findUnique({
     where: {
@@ -50,7 +50,11 @@ export const canWriteRoom = async (
     },
   });
 
-  if (room === null || !canRoomAcceptUserMessages(room)) {
+  if (room === null) {
+    throw new NotFoundError('Room was not found.');
+  }
+
+  if (!canRoomAcceptUserMessages(room)) {
     throw new ForbiddenError('Room does not accept user messages.');
   }
 

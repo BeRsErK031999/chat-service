@@ -84,6 +84,46 @@ button:disabled {
   min-height: 100vh;
 }
 
+.playground-shell {
+  position: relative;
+  min-height: 100vh;
+}
+
+.playground-switcher {
+  position: fixed;
+  z-index: 2;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #cdd6dd;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgb(28 36 48 / 12%);
+}
+
+.playground-switcher button {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 6px;
+}
+
+.chat-widget-embedded,
+.chat-widget-compact {
+  min-height: 0;
+  height: 100%;
+}
+
+.chat-widget-compact {
+  grid-template-columns: minmax(220px, 280px) minmax(320px, 1fr);
+}
+
+.chat-widget-compact .notifications {
+  display: none;
+}
+
 .sidebar,
 .notifications {
   min-width: 0;

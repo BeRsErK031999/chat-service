@@ -1,11 +1,14 @@
-import type { Notification, Prisma, PrismaClient } from '@prisma/client';
+import type { Message, Notification, Prisma, PrismaClient } from '@prisma/client';
+import { NotificationDeliveryState, NotificationPriority } from '@prisma/client';
 
 import { createNotificationInputSchema } from './notificationTypes.js';
 import type { CreateNotificationInput } from './notificationTypes.js';
-import { ForbiddenError } from '../../shared/errors.js';
+import { NotFoundError } from '../../shared/errors.js';
+
+type NotificationClient = PrismaClient | Prisma.TransactionClient;
 
 export const createNotification = async (
-  prisma: PrismaClient,
+  prisma: NotificationClient,
   input: CreateNotificationInput,
 ): Promise<Notification> => {
   const data = createNotificationInputSchema.parse(input);
@@ -26,6 +29,76 @@ export const createNotification = async (
   return prisma.notification.create({
     data: notificationData,
   });
+};
+
+const buildMessagePreview = (body: string): string => {
+  const compactBody = body.trim().replace(/\s+/g, ' ');
+  const maxLength = 160;
+
+  if (compactBody.length <= maxLength) {
+    return compactBody;
+  }
+
+  return `${compactBody.slice(0, maxLength - 3)}...`;
+};
+
+export const createMessageNotifications = async (
+  prisma: NotificationClient,
+  message: Message,
+): Promise<Notification[]> => {
+  if (message.senderUserId === null || message.body === null) {
+    return [];
+  }
+
+  const recipients = await prisma.roomMember.findMany({
+    where: {
+      roomId: message.roomId,
+      leftAt: null,
+      userId: {
+        not: message.senderUserId,
+      },
+    },
+    select: {
+      userId: true,
+    },
+  });
+
+  const preview = buildMessagePreview(message.body);
+
+  return Promise.all(
+    recipients.map(async (recipient): Promise<Notification> => {
+      const sourceEventId = `message:${message.id}:user:${recipient.userId}`;
+      const existingNotification = await prisma.notification.findFirst({
+        where: {
+          userId: recipient.userId,
+          sourceEventId,
+        },
+      });
+
+      if (existingNotification !== null) {
+        return existingNotification;
+      }
+
+      return createNotification(prisma, {
+        userId: recipient.userId,
+        roomId: message.roomId,
+        messageId: message.id,
+        type: 'message',
+        title: 'New message',
+        body: preview,
+        priority: NotificationPriority.NORMAL,
+        deliveryState: NotificationDeliveryState.PENDING,
+        payload: {
+          roomId: message.roomId,
+          messageId: message.id,
+          senderId: message.senderUserId,
+          messageKind: message.type,
+          preview,
+        },
+        sourceEventId,
+      });
+    }),
+  );
 };
 
 export type NotificationStateFilter = 'unread' | 'read' | 'all';
@@ -75,7 +148,7 @@ export const markNotificationRead = async (
   });
 
   if (result.count === 0) {
-    throw new ForbiddenError('Notification does not belong to user.');
+    throw new NotFoundError('Notification was not found.');
   }
 
   return prisma.notification.findUniqueOrThrow({

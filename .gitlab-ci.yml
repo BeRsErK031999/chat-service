@@ -1,0 +1,110 @@
+image: node:20
+
+stages:
+  - install
+  - lint
+  - typecheck
+  - test
+  - image
+  - build
+
+default:
+  interruptible: true
+  cache:
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - node_modules/
+  before_script:
+    - corepack enable
+    - yarn install --frozen-lockfile
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
+
+.run_optional_script:
+  script:
+    - |
+      if node -e "const scripts=require('./package.json').scripts||{}; process.exit(scripts[process.env.NPM_SCRIPT] ? 0 : 1)"; then
+        yarn "$NPM_SCRIPT"
+      else
+        echo "Skipping missing script: $NPM_SCRIPT"
+      fi
+
+.build_kaniko_image:
+  stage: image
+  timeout: 20 minutes
+  image:
+    name: gcr.io/kaniko-project/executor:v1.23.2-debug
+    entrypoint: [""]
+  before_script: []
+  cache: []
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    - |
+      IMAGE_REPOSITORY="$CI_REGISTRY_IMAGE/$IMAGE_NAME"
+      DESTINATIONS="--destination $IMAGE_REPOSITORY:$CI_COMMIT_SHORT_SHA"
+      if [ "$CI_COMMIT_BRANCH" = "develop" ]; then
+        DESTINATIONS="$DESTINATIONS --destination $IMAGE_REPOSITORY:dev"
+      elif [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        DESTINATIONS="$DESTINATIONS --destination $IMAGE_REPOSITORY:prod"
+      fi
+      /kaniko/executor --context "$CI_PROJECT_DIR" --dockerfile "$CI_PROJECT_DIR/$DOCKERFILE" --cache=true --cache-repo "$IMAGE_REPOSITORY/cache" $DESTINATIONS
+
+install:
+  stage: install
+  timeout: 10 minutes
+  script:
+    - yarn install --frozen-lockfile
+    - yarn prisma:generate
+
+lint:
+  stage: lint
+  timeout: 10 minutes
+  variables:
+    NPM_SCRIPT: lint
+  extends: .run_optional_script
+
+typecheck:
+  stage: typecheck
+  timeout: 10 minutes
+  variables:
+    NPM_SCRIPT: type-check
+  extends: .run_optional_script
+
+test:
+  stage: test
+  timeout: 15 minutes
+  variables:
+    NPM_SCRIPT: test
+  extends: .run_optional_script
+
+build_backend_image:
+  extends: .build_kaniko_image
+  variables:
+    IMAGE_NAME: backend
+    DOCKERFILE: Dockerfile
+
+build_frontend_image:
+  extends: .build_kaniko_image
+  variables:
+    IMAGE_NAME: frontend
+    DOCKERFILE: Dockerfile.frontend
+
+build:
+  stage: build
+  timeout: 15 minutes
+  script:
+    - yarn build
+  artifacts:
+    when: on_success
+    expire_in: 1 week
+    paths:
+      - dist/
