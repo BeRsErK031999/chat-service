@@ -56,7 +56,7 @@ workflow:
       elif [ "$CI_COMMIT_BRANCH" = "main" ]; then
         DESTINATIONS="$DESTINATIONS --destination $IMAGE_REPOSITORY:prod"
       fi
-      /kaniko/executor --context "$CI_PROJECT_DIR" --dockerfile "$CI_PROJECT_DIR/$DOCKERFILE" --cache=true --cache-repo "$IMAGE_REPOSITORY/cache" $DESTINATIONS
+      /kaniko/executor --context "$CI_PROJECT_DIR" --dockerfile "$CI_PROJECT_DIR/$DOCKERFILE" --snapshot-mode=redo --use-new-run --cache=true --cache-repo "$IMAGE_REPOSITORY/cache" $DESTINATIONS
 
 install:
   stage: install
