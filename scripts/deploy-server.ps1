@@ -19,7 +19,55 @@ $FrontendTarName = "chat-service-playground.tar"
 $LocalImageDir = Join-Path ([System.IO.Path]::GetTempPath()) "$ProjectName-deploy-images"
 $LocalBackendTar = Join-Path $LocalImageDir $BackendTarName
 $LocalFrontendTar = Join-Path $LocalImageDir $FrontendTarName
-$UsePasswordTransport = -not [string]::IsNullOrWhiteSpace($env:CHAT_SERVICE_DEPLOY_PASSWORD)
+$DeploySshKey = $env:CHAT_SERVICE_DEPLOY_SSH_KEY
+$UsePasswordTransport = $false
+$UseSshKeyTransport = $false
+
+function Test-SshAccess {
+  param(
+    [string]$KeyPath
+  )
+
+  $sshArgs = @("-o", "BatchMode=yes", "-o", "ConnectTimeout=10")
+
+  if (-not [string]::IsNullOrWhiteSpace($KeyPath)) {
+    $sshArgs += @("-i", $KeyPath)
+  }
+
+  $sshArgs += @($Server, "true")
+  & ssh @sshArgs *> $null
+
+  return $LASTEXITCODE -eq 0
+}
+
+function Select-Transport {
+  if (-not [string]::IsNullOrWhiteSpace($DeploySshKey)) {
+    if (-not (Test-Path -LiteralPath $DeploySshKey -PathType Leaf)) {
+      throw "SSH key file from CHAT_SERVICE_DEPLOY_SSH_KEY was not found."
+    }
+
+    if (-not (Test-SshAccess $DeploySshKey)) {
+      throw "SSH access failed with CHAT_SERVICE_DEPLOY_SSH_KEY. Check the key path and server authorized_keys."
+    }
+
+    $script:UseSshKeyTransport = $true
+    Write-Host "Using SSH key transport from CHAT_SERVICE_DEPLOY_SSH_KEY."
+    return
+  }
+
+  if (Test-SshAccess "") {
+    Write-Host "Using system ssh/scp transport."
+    return
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($env:CHAT_SERVICE_DEPLOY_PASSWORD)) {
+    $script:UsePasswordTransport = $true
+    Write-Host "Using password-based SSH transport from CHAT_SERVICE_DEPLOY_PASSWORD as temporary fallback."
+    return
+  }
+
+  throw "SSH access failed. Configure key auth or set CHAT_SERVICE_DEPLOY_PASSWORD for temporary fallback."
+}
 
 function Invoke-PasswordRemote {
   param(
@@ -118,7 +166,18 @@ function Invoke-Remote {
     return
   }
 
-  ssh $Server $Command
+  $sshArgs = @()
+
+  if ($UseSshKeyTransport) {
+    $sshArgs += @("-i", $DeploySshKey)
+  }
+
+  $sshArgs += @($Server, $Command)
+  & ssh @sshArgs
+
+  if ($LASTEXITCODE -ne 0) {
+    throw "Remote command failed with exit code $LASTEXITCODE"
+  }
 }
 
 function Copy-ToServer {
@@ -134,7 +193,18 @@ function Copy-ToServer {
     return
   }
 
-  scp $Source "${Server}:$Destination"
+  $scpArgs = @()
+
+  if ($UseSshKeyTransport) {
+    $scpArgs += @("-i", $DeploySshKey)
+  }
+
+  $scpArgs += @($Source, "${Server}:$Destination")
+  & scp @scpArgs
+
+  if ($LASTEXITCODE -ne 0) {
+    throw "SCP upload failed with exit code $LASTEXITCODE"
+  }
 }
 
 if (-not (Test-Path -LiteralPath "Dockerfile" -PathType Leaf)) {
@@ -155,11 +225,8 @@ if (-not (Test-Path -LiteralPath "deploy/nginx.chat-service.conf" -PathType Leaf
 
 New-Item -ItemType Directory -Force -Path $LocalImageDir | Out-Null
 
-if ($UsePasswordTransport) {
-  Write-Host "Using password-based SSH transport from CHAT_SERVICE_DEPLOY_PASSWORD."
-} else {
-  Write-Host "Using system ssh/scp transport."
-}
+Write-Host "Checking SSH access before Docker build..."
+Select-Transport
 
 Write-Host "Building backend image $BackendImage..."
 docker build -t $BackendImage -f Dockerfile .

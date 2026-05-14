@@ -8,7 +8,55 @@ $ServerProjectDir = "/opt/apps/projects/$ProjectName"
 $LocalPrismaDir = "prisma"
 $LocalSchemaPath = Join-Path $LocalPrismaDir "schema.prisma"
 $LocalMigrationsDir = Join-Path $LocalPrismaDir "migrations"
-$UsePasswordTransport = -not [string]::IsNullOrWhiteSpace($env:CHAT_SERVICE_DEPLOY_PASSWORD)
+$DeploySshKey = $env:CHAT_SERVICE_DEPLOY_SSH_KEY
+$UsePasswordTransport = $false
+$UseSshKeyTransport = $false
+
+function Test-SshAccess {
+  param(
+    [string]$KeyPath
+  )
+
+  $sshArgs = @("-o", "BatchMode=yes", "-o", "ConnectTimeout=10")
+
+  if (-not [string]::IsNullOrWhiteSpace($KeyPath)) {
+    $sshArgs += @("-i", $KeyPath)
+  }
+
+  $sshArgs += @($Server, "true")
+  & ssh @sshArgs *> $null
+
+  return $LASTEXITCODE -eq 0
+}
+
+function Select-Transport {
+  if (-not [string]::IsNullOrWhiteSpace($DeploySshKey)) {
+    if (-not (Test-Path -LiteralPath $DeploySshKey -PathType Leaf)) {
+      throw "SSH key file from CHAT_SERVICE_DEPLOY_SSH_KEY was not found."
+    }
+
+    if (-not (Test-SshAccess $DeploySshKey)) {
+      throw "SSH access failed with CHAT_SERVICE_DEPLOY_SSH_KEY. Check the key path and server authorized_keys."
+    }
+
+    $script:UseSshKeyTransport = $true
+    Write-Host "Using SSH key transport from CHAT_SERVICE_DEPLOY_SSH_KEY."
+    return
+  }
+
+  if (Test-SshAccess "") {
+    Write-Host "Using system ssh/scp transport."
+    return
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($env:CHAT_SERVICE_DEPLOY_PASSWORD)) {
+    $script:UsePasswordTransport = $true
+    Write-Host "Using password-based SSH transport from CHAT_SERVICE_DEPLOY_PASSWORD as temporary fallback."
+    return
+  }
+
+  throw "SSH access failed. Configure key auth or set CHAT_SERVICE_DEPLOY_PASSWORD for temporary fallback."
+}
 
 function Invoke-PasswordRemote {
   param(
@@ -167,7 +215,72 @@ function Invoke-Remote {
     return
   }
 
-  ssh $Server $Command
+  $sshArgs = @()
+
+  if ($UseSshKeyTransport) {
+    $sshArgs += @("-i", $DeploySshKey)
+  }
+
+  $sshArgs += @($Server, $Command)
+  & ssh @sshArgs
+
+  if ($LASTEXITCODE -ne 0) {
+    throw "Remote command failed with exit code $LASTEXITCODE"
+  }
+}
+
+function Copy-FileToServer {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Source,
+    [Parameter(Mandatory = $true)]
+    [string]$Destination
+  )
+
+  if ($UsePasswordTransport) {
+    Copy-PasswordFileToServer $Source $Destination
+    return
+  }
+
+  $scpArgs = @()
+
+  if ($UseSshKeyTransport) {
+    $scpArgs += @("-i", $DeploySshKey)
+  }
+
+  $scpArgs += @($Source, "${Server}:$Destination")
+  & scp @scpArgs
+
+  if ($LASTEXITCODE -ne 0) {
+    throw "SCP upload failed with exit code $LASTEXITCODE"
+  }
+}
+
+function Copy-DirectoryToServer {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Source,
+    [Parameter(Mandatory = $true)]
+    [string]$Destination
+  )
+
+  if ($UsePasswordTransport) {
+    Copy-PasswordDirectoryToServer $Source $Destination
+    return
+  }
+
+  $scpArgs = @()
+
+  if ($UseSshKeyTransport) {
+    $scpArgs += @("-i", $DeploySshKey)
+  }
+
+  $scpArgs += @("-r", $Source, "${Server}:$Destination")
+  & scp @scpArgs
+
+  if ($LASTEXITCODE -ne 0) {
+    throw "SCP directory upload failed with exit code $LASTEXITCODE"
+  }
 }
 
 if (-not (Test-Path -LiteralPath $LocalSchemaPath -PathType Leaf)) {
@@ -185,17 +298,11 @@ if ($MigrationDirectories.Count -eq 0) {
 
 Write-Host "Uploading Prisma schema and migrations to server..."
 Write-Host "The script uploads schema.prisma and migrations only; .env files are not uploaded."
-if ($UsePasswordTransport) {
-  Write-Host "Using password-based SSH transport from CHAT_SERVICE_DEPLOY_PASSWORD."
-  Invoke-Remote "mkdir -p $ServerProjectDir/prisma && rm -rf $ServerProjectDir/prisma/migrations"
-  Copy-PasswordFileToServer $LocalSchemaPath "$ServerProjectDir/prisma/schema.prisma"
-  Copy-PasswordDirectoryToServer $LocalMigrationsDir "$ServerProjectDir/prisma/migrations"
-} else {
-  Write-Host "Using system ssh/scp transport."
-  ssh $Server "mkdir -p $ServerProjectDir/prisma && rm -rf $ServerProjectDir/prisma/migrations"
-  scp $LocalSchemaPath "${Server}:${ServerProjectDir}/prisma/schema.prisma"
-  scp -r $LocalMigrationsDir "${Server}:${ServerProjectDir}/prisma/"
-}
+Write-Host "Checking SSH access before upload..."
+Select-Transport
+Invoke-Remote "mkdir -p $ServerProjectDir/prisma && rm -rf $ServerProjectDir/prisma/migrations"
+Copy-FileToServer $LocalSchemaPath "$ServerProjectDir/prisma/schema.prisma"
+Copy-DirectoryToServer $LocalMigrationsDir "$ServerProjectDir/prisma/migrations"
 
 Write-Host "Applying Prisma migrations on the server with docker compose..."
 Invoke-Remote "cd $ServerProjectDir && docker compose run --rm app yarn prisma migrate deploy"

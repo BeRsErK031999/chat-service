@@ -20,6 +20,8 @@ Nginx exposes:
 
 ## Standard Workflow
 
+Configure SSH key auth first; it is the normal deploy path. Password deploy is only a temporary fallback.
+
 Deploy application containers:
 
 ```powershell
@@ -48,6 +50,62 @@ docker compose run --rm app yarn dev:seed:server
 `yarn deploy:server` intentionally does not run Prisma migrations. Deploy and migration are separate operations so image
 rollout and data-model changes can be reviewed independently.
 
+## SSH Authentication
+
+Key-based SSH is the normal deploy mode. Generate a dedicated deploy key on Windows:
+
+```powershell
+ssh-keygen -t ed25519 -C "chat-service-deploy"
+```
+
+For example, save it as:
+
+```text
+C:\Users\<you>\.ssh\chat-service-deploy
+```
+
+Add the public key to the server user's authorized keys:
+
+```bash
+mkdir -p ~/.ssh
+chmod 700 ~/.ssh
+cat chat-service-deploy.pub >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+```
+
+Verify access from Windows:
+
+```powershell
+ssh -i "C:\Users\<you>\.ssh\chat-service-deploy" admin_devops@192.168.22.37
+```
+
+Set the key path for deploy commands in the current PowerShell session:
+
+```powershell
+$env:CHAT_SERVICE_DEPLOY_SSH_KEY="C:\Users\<you>\.ssh\chat-service-deploy"
+```
+
+Then run:
+
+```powershell
+yarn deploy:server
+yarn deploy:migrate:server
+```
+
+Transport priority is:
+
+1. `CHAT_SERVICE_DEPLOY_SSH_KEY`
+2. normal `ssh`/`scp` using the system SSH config or agent
+3. `CHAT_SERVICE_DEPLOY_PASSWORD` as temporary emergency fallback
+
+The scripts run an SSH preflight before Docker build or upload. If SSH is unavailable, they fail with:
+
+```text
+SSH access failed. Configure key auth or set CHAT_SERVICE_DEPLOY_PASSWORD for temporary fallback.
+```
+
+Do not commit private keys, passwords, or real server `.env` files.
+
 ## Deploy Script
 
 `scripts/deploy-server.ps1` runs from Windows PowerShell. It:
@@ -66,6 +124,10 @@ rollout and data-model changes can be reviewed independently.
 - runs `docker compose ps`
 - checks `http://127.0.0.1:4100/health`
 - checks `http://127.0.0.1:4101/`
+
+It checks SSH access before building Docker images. With `CHAT_SERVICE_DEPLOY_SSH_KEY`, the script passes `-i <key>` to
+`ssh` and `scp`. Without it, the script uses normal `ssh` and `scp`, which can use your SSH config or agent. If both
+key-based paths are unavailable and `CHAT_SERVICE_DEPLOY_PASSWORD` is set, it uses the password fallback.
 
 The script requires the server-side `.env` to already exist:
 
@@ -93,6 +155,8 @@ docker compose ps
 ```
 
 Run it after the first deploy and whenever the deployed image expects database changes from new Prisma migrations.
+
+It uses the same SSH transport priority as deploy: explicit key, system SSH config or agent, then password fallback.
 
 ## Cleanup
 
