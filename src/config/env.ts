@@ -11,6 +11,7 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   DATABASE_URL: z.string().url(),
   AUTH_MODE: authModeSchema.default('standalone'),
+  CHAT_CORS_ALLOWED_ORIGINS: z.string().default(''),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -20,20 +20,24 @@ export const MessageList = ({
   messagesEmptyLabel = 'No messages yet.',
   selectRoomEmptyLabel = 'Choose a room to read messages.',
 }: MessageListProps): ReactElement => (
-  <div className="messages">
-    {isLoading ? <p className="loading-state">Loading messages...</p> : null}
+  <div className="chat-ui-message-list">
+    {isLoading ? <p className="chat-ui-loading-state">Loading messages...</p> : null}
     {selectedRoom === null && !isLoading ? (
-      <p className="empty-state">{selectRoomEmptyLabel}</p>
+      <p className="chat-ui-empty-state">{selectRoomEmptyLabel}</p>
     ) : null}
     {selectedRoom !== null && messages.length === 0 && !isLoading ? (
-      <p className="empty-state">{messagesEmptyLabel}</p>
+      <p className="chat-ui-empty-state">{messagesEmptyLabel}</p>
     ) : null}
     {messages.map((message) => (
       <article
         key={message.id}
-        className={message.senderUserId === currentUserId ? 'message mine' : 'message'}
+        className={
+          message.senderUserId === currentUserId
+            ? 'chat-ui-message chat-ui-message-mine'
+            : 'chat-ui-message'
+        }
       >
-        <div className="message-meta">
+        <div className="chat-ui-message-meta">
           <span>{message.senderUserId === null ? 'System' : message.senderUserId}</span>
           <time>{formatTime(message.createdAt)}</time>
         </div>

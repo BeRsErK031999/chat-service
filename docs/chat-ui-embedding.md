@@ -3,6 +3,8 @@
 `frontend/src/chat-ui` is the reusable host-facing layer for embedding chat into a desktop shell or web gantt later.
 The current `/chat/` playground remains the only integration in this step.
 
+For host adapter patterns and the staged desktop/web plan, see [Host Integration Plan](./host-integration-plan.md).
+
 This step does not add desktop integration, web gantt integration, production auth, package publishing, Storybook,
 Docker changes, NATS, or WebSocket transport.
 
@@ -12,15 +14,19 @@ Hosts embed `ChatWidget` from `frontend/src/chat-ui`:
 
 ```tsx
 import { ChatWidget } from './chat-ui';
+import type { ChatWidgetCallbacks, ChatWidgetUser } from './chat-ui';
 
-<ChatWidget
-  apiBaseUrl="/chat/api"
-  currentUser={{
-    id: '11111111-1111-4111-8111-111111111111',
-    displayName: 'Artem',
-  }}
-  mode="full"
-/>;
+const currentUser: ChatWidgetUser = {
+  id: '11111111-1111-4111-8111-111111111111',
+  displayName: 'Artem',
+};
+
+const callbacks: ChatWidgetCallbacks = {
+  onUnreadCountChange: (count) => updateHostBadge(count),
+  onClose: () => closeHostPanel(),
+};
+
+<ChatWidget apiBaseUrl="/chat/api" currentUser={currentUser} mode="full" callbacks={callbacks} />;
 ```
 
 If `auth` is omitted, the widget uses `currentUser.id` as dev auth:
@@ -34,18 +40,35 @@ If `auth` is omitted, the widget uses `currentUser.id` as dev auth:
 
 ## Props
 
-| Prop | Required | Description |
-| --- | --- | --- |
-| `apiBaseUrl` | yes | Base HTTP API path, for example `/chat/api`. SSE events are built from this value. |
-| `currentUser` | yes | Host-provided user identity with `id` and `displayName`. |
-| `auth` | no | Auth strategy. Defaults to dev `x-user-id` based on `currentUser.id`. |
-| `context` | no | Host context for room/task embedding. Supports `taskId`, `roomId`, `roomScope`, and `source`. |
-| `initialRoomId` | no | Backward-compatible room id to select on load. `context.roomId` takes precedence. |
-| `mode` | no | `"full"`, `"embedded"`, or `"compact"`. Defaults to `"full"`. Compact hides notifications. |
-| `enableRealtime` | no | Enables SSE realtime when `true`. Defaults to `true`; polling fallback still runs when disconnected. |
-| `className` | no | Optional class added to the widget shell for host-specific layout. |
-| `callbacks` | no | Host callbacks for unread count, room changes, message sent, auth/access errors, realtime status, close, and notifications. |
-| `labels` | no | Host text overrides for title and empty states. |
+| Prop             | Required | Description                                                                                                                 |
+| ---------------- | -------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `apiBaseUrl`     | yes      | Base HTTP API path, for example `/chat/api`. SSE events are built from this value.                                          |
+| `currentUser`    | yes      | Host-provided user identity with `id` and `displayName`.                                                                    |
+| `auth`           | no       | Auth strategy. Defaults to dev `x-user-id` based on `currentUser.id`.                                                       |
+| `context`        | no       | Host context for room/task embedding. Supports `taskId`, `roomId`, `roomScope`, and `source`.                               |
+| `initialRoomId`  | no       | Backward-compatible room id to select on load. `context.roomId` takes precedence.                                           |
+| `mode`           | no       | `"full"`, `"embedded"`, or `"compact"`. Defaults to `"full"`. Compact hides notifications.                                  |
+| `enableRealtime` | no       | Enables SSE realtime when `true`. Defaults to `true`; polling fallback still runs when disconnected.                        |
+| `className`      | no       | Optional class added to the widget shell for host-specific layout.                                                          |
+| `callbacks`      | no       | Host callbacks for unread count, room changes, message sent, auth/access errors, realtime status, close, and notifications. |
+| `labels`         | no       | Host text overrides for title and empty states.                                                                             |
+
+## Styling / CSS Isolation
+
+`ChatWidget` imports `frontend/src/chat-ui/chat-widget.css` from inside the reusable `chat-ui` module. Its internal
+classes are prefixed with `chat-ui-` and scoped under `.chat-ui-root`, including the local box-sizing reset.
+
+The app-level `frontend/src/styles.css` is not part of the reusable widget contract. Playground-only styling lives in
+`frontend/src/playground/playground.css`.
+
+Hosts can pass `className` to size or position the widget root:
+
+```tsx
+<ChatWidget className="host-chat-panel" mode="embedded" {...props} />
+```
+
+Shadow DOM is not used yet. Host applications should avoid broad global CSS, highly specific element selectors, and
+`!important` rules that target generic descendants, because those can still override normal scoped widget styles.
 
 ## Types
 
@@ -123,7 +146,7 @@ callback, so the playground does not show close controls.
     title: 'Task chat',
     selectRoomEmpty: 'Select a task chat.',
   }}
-/>;
+/>
 ```
 
 ## Web Gantt Example
@@ -148,7 +171,7 @@ callback, so the playground does not show close controls.
     onAuthError: () => redirectToLogin(),
     onAccessDenied: (error) => showToast(error.message),
   }}
-/>;
+/>
 ```
 
 ## Auth Status
@@ -190,7 +213,7 @@ Minimal task-context embed:
     roomScope: 'internal',
     source: 'desktop',
   }}
-/>;
+/>
 ```
 
 ## Layer Ownership
@@ -218,6 +241,6 @@ Dev users must not be imported into `frontend/src/chat-ui`.
 - Auth is not production-ready.
 - Task room lookup does not auto-create missing rooms.
 - Task room lookup only checks current room membership; organization/project ACLs are not implemented in this step.
-- The chat UI is still styled by the app-level `frontend/src/styles.css`.
+- CSS is scoped by `chat-ui-` class names, but Shadow DOM isolation is not implemented.
 - SSE remains the realtime transport; WebSocket is intentionally not added.
 - No desktop shell or web gantt integration exists yet.

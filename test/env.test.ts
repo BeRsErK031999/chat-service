@@ -9,6 +9,7 @@ describe('loadEnv', () => {
       LOG_LEVEL: 'debug',
       DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/chat_service',
       AUTH_MODE: 'integrated',
+      CHAT_CORS_ALLOWED_ORIGINS: 'http://localhost:5175,http://127.0.0.1:5175',
     });
 
     expect(result).toEqual({
@@ -16,6 +17,7 @@ describe('loadEnv', () => {
       LOG_LEVEL: 'debug',
       DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/chat_service',
       AUTH_MODE: 'integrated',
+      CHAT_CORS_ALLOWED_ORIGINS: 'http://localhost:5175,http://127.0.0.1:5175',
     });
   });
 
@@ -29,6 +31,7 @@ describe('loadEnv', () => {
     expect(result.PORT).toBe(3000);
     expect(result.LOG_LEVEL).toBe('info');
     expect(result.AUTH_MODE).toBe('standalone');
+    expect(result.CHAT_CORS_ALLOWED_ORIGINS).toBe('');
   });
 
   it('rejects unsupported auth modes', async () => {

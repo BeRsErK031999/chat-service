@@ -137,6 +137,29 @@ The script requires the server-side `.env` to already exist:
 
 Use `deploy/.env.server.example` as a template and never commit real server secrets.
 
+For desktop/web host CORS, the server-side `.env` must include the allowed browser origins:
+
+```env
+CHAT_CORS_ALLOWED_ORIGINS=http://localhost:5175,http://127.0.0.1:5175,http://192.168.22.37
+```
+
+Requests without an `Origin` header, such as curl, server-side checks, and health checks, are still allowed. Browser
+requests are allowed only when the `Origin` value is in this comma-separated allowlist. CORS is handled by Fastify; do
+not add a duplicate CORS workaround in nginx.
+
+After changing the server `.env`, restart the app container. If an image change is included, run:
+
+```powershell
+yarn deploy:server
+```
+
+If only `.env` changed and the current image is already correct, restart with the server's compose workflow:
+
+```bash
+cd /opt/apps/projects/chat-service
+docker compose up -d
+```
+
 ## Migration Script
 
 `scripts/migrate-server.ps1` is separate from deploy. It:
@@ -214,6 +237,9 @@ proxy_http_version 1.1;
 proxy_buffering off;
 proxy_read_timeout 1h;
 ```
+
+CORS headers are emitted by the Fastify app, including for `/chat/api/events`; nginx should keep proxying OPTIONS and SSE
+without adding its own CORS headers.
 
 Reload Nginx with the server's established workflow after validating the host config.
 

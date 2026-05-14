@@ -15,7 +15,7 @@ export const MessageComposer = ({
   onDraftChange,
   onSend,
 }: MessageComposerProps): ReactElement => (
-  <form className="composer" onSubmit={onSend}>
+  <form className="chat-ui-composer" onSubmit={onSend}>
     <input
       value={draft}
       onChange={(event) => onDraftChange(event.target.value)}

@@ -24,11 +24,11 @@ type DevUserSwitcherProps = {
 };
 
 export const DevUserSwitcher = ({ onSelectUser }: DevUserSwitcherProps): ReactElement => (
-  <main className="login-screen">
-    <section className="login-panel">
-      <p className="eyebrow">Internal testing</p>
+  <main className="playground-login-screen">
+    <section className="playground-login-panel">
+      <p className="playground-eyebrow">Internal testing</p>
       <h1>Chat playground</h1>
-      <div className="user-grid">
+      <div className="playground-user-grid">
         {devUsers.map((user) => (
           <button key={user.id} type="button" onClick={() => onSelectUser(user)}>
             <span>{user.label}</span>

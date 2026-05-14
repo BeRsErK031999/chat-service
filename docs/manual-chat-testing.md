@@ -59,6 +59,32 @@ Preflight before browser testing:
 - The selected user sees `Realtime connected`.
 - `Open task-123/internal` opens the seeded task room.
 
+Desktop CORS check for the time-tracker dev renderer:
+
+```bash
+curl -i "http://192.168.22.37/chat/api/rooms" \
+  -H "Origin: http://localhost:5175" \
+  -H "x-user-id: 11111111-1111-4111-8111-111111111111"
+```
+
+Expected headers include:
+
+```text
+Access-Control-Allow-Origin: http://localhost:5175
+```
+
+Preflight for message sending:
+
+```bash
+curl -i -X OPTIONS "http://192.168.22.37/chat/api/rooms/<direct-room-id>/messages" \
+  -H "Origin: http://localhost:5175" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: content-type,x-user-id,idempotency-key"
+```
+
+Expected headers include `Access-Control-Allow-Origin: http://localhost:5175` and
+`Access-Control-Allow-Headers` containing `content-type`, `x-user-id`, and `idempotency-key`.
+
 The deploy builds and uploads two images:
 
 - `chat-service:latest`

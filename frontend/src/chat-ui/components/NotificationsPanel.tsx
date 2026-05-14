@@ -18,23 +18,27 @@ export const NotificationsPanel = ({
   onMarkNotificationRead,
   onNotificationClick,
 }: NotificationsPanelProps): ReactElement => (
-  <aside className="notifications">
-    <div className="panel-header">
+  <aside className="chat-ui-notifications">
+    <div className="chat-ui-panel-header">
       <div>
-        <p className="eyebrow">Notifications</p>
+        <p className="chat-ui-eyebrow">Notifications</p>
         <strong>{notifications.filter((item) => item.readAt === null).length} unread</strong>
       </div>
       {isLoading ? <span>Loading...</span> : null}
     </div>
 
-    <div className="notification-list">
+    <div className="chat-ui-notification-list">
       {notifications.length === 0 && !isLoading ? (
-        <p className="empty-state">{emptyLabel}</p>
+        <p className="chat-ui-empty-state">{emptyLabel}</p>
       ) : null}
       {notifications.map((notification) => (
         <article
           key={notification.id}
-          className={notification.readAt === null ? 'notification unread' : 'notification'}
+          className={
+            notification.readAt === null
+              ? 'chat-ui-notification chat-ui-notification-unread'
+              : 'chat-ui-notification'
+          }
           onClick={() => onNotificationClick?.(notification)}
         >
           <strong>{notification.title}</strong>

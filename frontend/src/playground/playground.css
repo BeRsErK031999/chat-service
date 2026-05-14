@@ -1,0 +1,82 @@
+.playground-login-screen {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 32px;
+}
+
+.playground-login-panel {
+  width: min(520px, 100%);
+  padding: 28px;
+  border: 1px solid #cdd6dd;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.playground-login-panel h1 {
+  margin: 4px 0 0;
+}
+
+.playground-eyebrow {
+  margin: 0;
+  color: #637083;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.playground-user-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.playground-user-grid button {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid #b9c5cf;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1c2430;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.playground-user-grid small {
+  color: #637083;
+}
+
+.playground-shell {
+  position: relative;
+  min-height: 100vh;
+}
+
+.playground-switcher {
+  position: fixed;
+  z-index: 2;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #cdd6dd;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgb(28 36 48 / 12%);
+}
+
+.playground-switcher button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #b9c5cf;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1c2430;
+  font: inherit;
+  cursor: pointer;
+}

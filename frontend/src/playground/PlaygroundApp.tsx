@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import { ChatWidget } from '../chat-ui';
 import { DevUserSwitcher } from './DevUserSwitcher';
 import type { DevUser } from './DevUserSwitcher';
+import './playground.css';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '/chat/api';
 

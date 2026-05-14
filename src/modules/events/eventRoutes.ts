@@ -4,6 +4,7 @@ import type { PrismaClient } from '@prisma/client';
 import { eventsQuerySchema } from './eventTypes.js';
 import { sseConnectionManager } from './sseConnectionManager.js';
 import type { SseConnectionManager } from './sseConnectionManager.js';
+import { isCorsOriginAllowed } from '../../config/cors.js';
 import { UnauthorizedError } from '../../shared/errors.js';
 
 export const registerEventRoutes = (
@@ -22,6 +23,14 @@ export const registerEventRoutes = (
     }
 
     const parsedUserId = eventsQuerySchema.shape.userId.unwrap().parse(userId);
+    const origin = request.headers.origin;
+    const corsHeaders =
+      origin !== undefined && isCorsOriginAllowed(origin)
+        ? {
+            'access-control-allow-origin': origin,
+            vary: 'Origin',
+          }
+        : {};
 
     reply.hijack();
     reply.raw.writeHead(200, {
@@ -29,6 +38,7 @@ export const registerEventRoutes = (
       connection: 'keep-alive',
       'content-type': 'text/event-stream; charset=utf-8',
       'x-accel-buffering': 'no',
+      ...corsHeaders,
     });
     reply.raw.flushHeaders();
     manager.addConnection(parsedUserId, reply.raw);
