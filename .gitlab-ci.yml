@@ -7,6 +7,7 @@ stages:
   - test
   - image
   - build
+  - deploy
 
 default:
   interruptible: true
@@ -108,3 +109,79 @@ build:
     expire_in: 1 week
     paths:
       - dist/
+
+.deploy:
+  stage: deploy
+  image: alpine:3.20
+  before_script:
+    - apk add --no-cache openssh-client
+    - mkdir -p ~/.ssh
+    - cp "$SSH_PRIVATE_KEY" ~/.ssh/id_ed25519
+    - cp "$SSH_KNOWN_HOSTS" ~/.ssh/known_hosts
+    - chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+  cache: []
+  dependencies: []
+  script:
+    - |
+      set -e
+      DEPLOY_TARGET_HOST="${DEPLOY_HOST}"
+      if [ "${DEVOPS_ENV_DIR}" = "prod" ] && [ -n "${DEPLOY_HOST_PROD:-}" ]; then
+        DEPLOY_TARGET_HOST="${DEPLOY_HOST_PROD}"
+      fi
+      DEPLOY_TARGET_USER="${DEPLOY_USER}"
+      if [ "${DEVOPS_ENV_DIR}" = "prod" ] && [ -n "${DEPLOY_USER_PROD:-}" ]; then
+        DEPLOY_TARGET_USER="${DEPLOY_USER_PROD}"
+      fi
+      COMPOSE_PATH="${STACK_COMPOSE_PATH:-${DEVOPS_ROOT:-/srv/devops}/${DEVOPS_ENV_DIR}/${SWARM_STACK_NAME}/docker-stack.yaml}"
+      if [ "${DEVOPS_ENV_DIR}" = "dev" ] && [ -n "${STACK_COMPOSE_PATH_DEV:-}" ]; then
+        COMPOSE_PATH="${STACK_COMPOSE_PATH_DEV}"
+      elif [ "${DEVOPS_ENV_DIR}" = "prod" ] && [ -n "${STACK_COMPOSE_PATH_PROD:-}" ]; then
+        COMPOSE_PATH="${STACK_COMPOSE_PATH_PROD}"
+      fi
+      ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes \
+          "${DEPLOY_TARGET_USER}@${DEPLOY_TARGET_HOST}" bash -s <<EOF
+      set -e
+      echo '${REGISTRY_DEPLOY_TOKEN}' | docker login -u '${REGISTRY_DEPLOY_USER}' --password-stdin '${CI_REGISTRY}'
+      docker stack deploy -c '${COMPOSE_PATH}' --with-registry-auth '${SWARM_STACK_NAME}'
+      docker logout '${CI_REGISTRY}'
+      EOF
+
+deploy-backend-dev:
+  extends: .deploy
+  variables:
+    DEVOPS_ENV_DIR: dev
+    SWARM_STACK_NAME: chat_service
+  environment:
+    name: development
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+deploy-frontend-dev:
+  extends: .deploy
+  variables:
+    DEVOPS_ENV_DIR: dev
+    SWARM_STACK_NAME: chat_service_frontend
+  environment:
+    name: development
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+deploy-backend-prod:
+  extends: .deploy
+  variables:
+    DEVOPS_ENV_DIR: prod
+    SWARM_STACK_NAME: chat_service
+  environment:
+    name: production
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+deploy-frontend-prod:
+  extends: .deploy
+  variables:
+    DEVOPS_ENV_DIR: prod
+    SWARM_STACK_NAME: chat_service_frontend
+  environment:
+    name: production
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
