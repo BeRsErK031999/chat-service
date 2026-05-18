@@ -25,7 +25,10 @@ const defaultDevCorsOrigins = [
 ];
 
 const parseCorsAllowedOrigins = (): Set<string> => {
-  const configuredOrigins = process.env.CORS_ALLOWED_ORIGINS?.split(',')
+  const configuredOrigins = (
+    process.env.CORS_ALLOWED_ORIGINS ?? process.env.CHAT_CORS_ALLOWED_ORIGINS
+  )
+    ?.split(',')
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);
   const origins =
