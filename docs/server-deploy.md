@@ -1,11 +1,12 @@
 # Server Deploy
 
-`chat-service` deploys from the Windows workstation to the Ubuntu Docker host. There is no registry, CI deploy,
-Kubernetes, or public Docker port exposure in this phase.
+`chat-service` deploys from the Windows workstation to the Ubuntu Docker host. The host `192.168.22.37` is the
+staging/test server used for feature-branch validation before merge to `develop` or release promotion to `main`. There is
+no registry, CI deploy, Kubernetes, or public Docker port exposure in this phase.
 
 ## Server Layout
 
-- SSH: `admin_devops@192.168.22.37`
+- SSH: `admin_devops@192.168.22.37` (staging/test server)
 - Project: `/opt/apps/projects/chat-service`
 - Uploaded images: `/opt/apps/images`
 - Backend: `127.0.0.1:4100`
@@ -20,7 +21,13 @@ Nginx exposes:
 
 ## Standard Workflow
 
-Configure SSH key auth first; it is the normal deploy path. Password deploy is only a temporary fallback.
+Configure SSH key auth first; it is the normal deploy path. Password deploy is only an emergency fallback.
+
+`yarn deploy:server` deploys the current local checkout. Check the selected branch before deploying:
+
+```powershell
+git branch --show-current
+```
 
 Deploy application containers:
 
@@ -48,7 +55,8 @@ docker compose run --rm app yarn dev:seed:server
 ```
 
 `yarn deploy:server` intentionally does not run Prisma migrations. Deploy and migration are separate operations so image
-rollout and data-model changes can be reviewed independently.
+rollout and data-model changes can be reviewed independently. Do not add automatic migration execution to application
+deploy.
 
 ## SSH Authentication
 
@@ -62,6 +70,18 @@ For example, save it as:
 
 ```text
 C:\Users\<you>\.ssh\chat-service-deploy
+```
+
+For the staging/test server, prefer a dedicated key name:
+
+```powershell
+ssh-keygen -t ed25519 -C "chat-service-staging"
+```
+
+For example, save it as:
+
+```text
+C:\Users\<user>\.ssh\chat-service-staging
 ```
 
 Add the public key to the server user's authorized keys:
@@ -85,6 +105,12 @@ Set the key path for deploy commands in the current PowerShell session:
 $env:CHAT_SERVICE_DEPLOY_SSH_KEY="C:\Users\<you>\.ssh\chat-service-deploy"
 ```
 
+Or, with the staging key:
+
+```powershell
+$env:CHAT_SERVICE_DEPLOY_SSH_KEY="C:\Users\<user>\.ssh\chat-service-staging"
+```
+
 Then run:
 
 ```powershell
@@ -96,15 +122,15 @@ Transport priority is:
 
 1. `CHAT_SERVICE_DEPLOY_SSH_KEY`
 2. normal `ssh`/`scp` using the system SSH config or agent
-3. `CHAT_SERVICE_DEPLOY_PASSWORD` as temporary emergency fallback
+3. `CHAT_SERVICE_DEPLOY_PASSWORD` as emergency fallback only
 
 The scripts run an SSH preflight before Docker build or upload. If SSH is unavailable, they fail with:
 
 ```text
-SSH access failed. Configure key auth or set CHAT_SERVICE_DEPLOY_PASSWORD for temporary fallback.
+SSH access failed. Configure key auth or set CHAT_SERVICE_DEPLOY_PASSWORD for emergency fallback.
 ```
 
-Do not commit private keys, passwords, or real server `.env` files.
+Do not commit private keys, passwords, or real server `.env` files. Do not write the server password in code or docs.
 
 ## Deploy Script
 
@@ -127,7 +153,7 @@ Do not commit private keys, passwords, or real server `.env` files.
 
 It checks SSH access before building Docker images. With `CHAT_SERVICE_DEPLOY_SSH_KEY`, the script passes `-i <key>` to
 `ssh` and `scp`. Without it, the script uses normal `ssh` and `scp`, which can use your SSH config or agent. If both
-key-based paths are unavailable and `CHAT_SERVICE_DEPLOY_PASSWORD` is set, it uses the password fallback.
+key-based paths are unavailable and `CHAT_SERVICE_DEPLOY_PASSWORD` is set, it uses the emergency password fallback.
 
 The script requires the server-side `.env` to already exist:
 
@@ -136,6 +162,39 @@ The script requires the server-side `.env` to already exist:
 ```
 
 Use `deploy/.env.server.example` as a template and never commit real server secrets.
+
+## Staging Smoke Checklist
+
+Before merging a feature branch to `develop`, verify the feature on the staging/test server:
+
+```powershell
+yarn type-check
+yarn lint
+yarn test
+yarn build
+yarn deploy:server
+```
+
+If the branch includes new Prisma migrations:
+
+```powershell
+yarn deploy:migrate:server
+```
+
+Use server-side seed only when dev smoke data is needed:
+
+```bash
+cd /opt/apps/projects/chat-service
+docker compose run --rm app yarn dev:seed:server
+```
+
+Manual checks:
+
+- Open `http://192.168.22.37/chat/`.
+- Verify desktop integration from `time-tracker-desktop`.
+- Verify CORS from the desktop renderer origin.
+- Verify SSE realtime through `/chat/api/events`.
+- Verify feature-specific chat behavior before merging to `develop`.
 
 ## Migration Script
 

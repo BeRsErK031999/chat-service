@@ -46,7 +46,7 @@ Deploy from the Windows workstation:
 yarn deploy:server
 ```
 
-Use key-based SSH for deploy. See `docs/server-deploy.md` for `CHAT_SERVICE_DEPLOY_SSH_KEY` setup and the temporary
+Use key-based SSH for deploy. See `docs/server-deploy.md` for `CHAT_SERVICE_DEPLOY_SSH_KEY` setup and the emergency
 password fallback.
 
 Preflight before browser testing:
