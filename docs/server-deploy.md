@@ -202,6 +202,48 @@ unless known-good tarballs are stored elsewhere.
 
 The `app` service does not run migrations automatically.
 
+## Auth Environment
+
+Production chat auth uses a signed internal bearer token created by the host app and verified by `chat-service`.
+Configure the backend `.env` on the server:
+
+```env
+CHAT_INTERNAL_AUTH_SECRET=<shared random secret, 32+ chars>
+CHAT_ALLOW_DEV_USER_ID=false
+```
+
+`CHAT_INTERNAL_AUTH_SECRET` must match the host app secret used to sign chat tokens. Rotate it as an application secret:
+do not commit it and do not put real values into docs.
+
+`CHAT_ALLOW_DEV_USER_ID` controls the legacy dev bridge:
+
+- `false` in production: `x-user-id` and `/events?userId=` are rejected.
+- `true` in local/dev smoke testing: HTTP `x-user-id` and SSE `?userId=` still work for the existing workflow.
+
+Token payload:
+
+```json
+{
+  "userId": "11111111-1111-4111-8111-111111111111",
+  "displayName": "Artem",
+  "issuedAt": 1779120000,
+  "expiresAt": 1779120900,
+  "source": "desktop"
+}
+```
+
+The service validates HS256 signature and `expiresAt`. Missing auth, invalid signatures, and expired tokens return `401`.
+Room membership and read-state permissions are unchanged.
+
+Browser `EventSource` cannot set `Authorization`, so the widget uses:
+
+```text
+/chat/api/events?accessToken=<short-lived-chat-token>
+```
+
+This query token is intentionally short-lived. Avoid logging query strings at reverse proxies and treat access logs as
+sensitive while this fallback is in use.
+
 ## Nginx
 
 `deploy/nginx.chat-service.conf` is a location-only include for the existing server block. Do not convert it into a full

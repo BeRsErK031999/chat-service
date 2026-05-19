@@ -141,6 +141,10 @@ export const createChatApiClient = (config: ChatApiClientConfig): ChatApiClient 
       url.searchParams.set('userId', config.auth.userId);
     }
 
+    if (config.auth.strategy === 'bearer' && config.auth.token !== undefined) {
+      url.searchParams.set('accessToken', config.auth.token);
+    }
+
     return url.toString();
   },
 });

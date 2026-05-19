@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const eventsQuerySchema = z.object({
   userId: z.string().uuid().optional(),
+  accessToken: z.string().min(1).optional(),
 });
 
 export type ServerEventMap = {

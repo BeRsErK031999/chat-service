@@ -3,8 +3,8 @@
 `frontend/src/chat-ui` is the reusable host-facing layer for embedding chat into a desktop shell or web gantt later.
 The current `/chat/` playground remains the only integration in this step.
 
-This step does not add desktop integration, web gantt integration, production auth, package publishing, Storybook,
-Docker changes, NATS, or WebSocket transport.
+This layer supports desktop/web host integration through the internal bearer auth bridge. It still does not add OAuth,
+package publishing, Storybook, NATS, or WebSocket transport.
 
 ## Public Component
 
@@ -23,12 +23,12 @@ import { ChatWidget } from './chat-ui';
 />;
 ```
 
-If `auth` is omitted, the widget uses `currentUser.id` as dev auth:
+If `auth` is omitted, the widget uses `currentUser.id` as dev auth. Production hosts should pass bearer auth explicitly:
 
 ```ts
 {
-  strategy: 'dev-user-id',
-  userId: currentUser.id,
+  strategy: 'bearer',
+  token: chatInternalToken,
 }
 ```
 
@@ -151,16 +151,45 @@ callback, so the playground does not show close controls.
 />;
 ```
 
-## Auth Status
+## Auth
 
-Auth is still temporary. The backend currently accepts dev identity through:
+Production hosts create a short-lived internal token using the shared `CHAT_INTERNAL_AUTH_SECRET` and pass it to the
+widget:
+
+```tsx
+<ChatWidget
+  apiBaseUrl="/chat/api"
+  currentUser={currentUser}
+  auth={{
+    strategy: 'bearer',
+    token: chatInternalToken,
+  }}
+/>
+```
+
+HTTP requests send:
+
+```text
+Authorization: Bearer <chat-internal-token>
+```
+
+The token is an HS256 JWT-style token with `userId`, `displayName`, `issuedAt`, `expiresAt`, and `source` (`desktop` or
+`web`). `expiresAt` is required and expired tokens are rejected with `401`.
+
+For SSE, browser `EventSource` cannot set custom headers. The widget therefore appends the same short-lived token:
+
+```text
+/events?accessToken=<chat-internal-token>
+```
+
+This is a compatibility fallback. Keep token TTL short and avoid logging query strings in production.
+
+Dev compatibility remains available only when the backend has `CHAT_ALLOW_DEV_USER_ID=true`:
 
 - HTTP `x-user-id`
-- SSE `?userId=` query parameter for `EventSource`
+- SSE `/events?userId=<uuid>`
 
-The widget centralizes auth handling in the frontend API/realtime client. `dev-user-id` is the only strategy that works
-end-to-end with the current backend. `cookie` and `bearer` are contract placeholders for a later production auth step;
-they do not make the backend production-authenticated in this phase.
+Set `CHAT_ALLOW_DEV_USER_ID=false` in production.
 
 ## Room Context
 
@@ -176,7 +205,7 @@ If `context.roomId` is not provided and `context.taskId + context.roomScope` are
 GET /task-rooms/lookup?taskId=<taskId>&roomScope=<roomScope>
 ```
 
-The backend returns a room only when the current dev-authenticated user is an active member. Missing links, missing
+The backend returns a room only when the authenticated user is an active member. Missing links, missing
 rooms, and rooms where the user is not an active member all return `404`.
 
 Minimal task-context embed:
@@ -215,7 +244,7 @@ Dev users must not be imported into `frontend/src/chat-ui`.
 
 ## Current Limits
 
-- Auth is not production-ready.
+- Host apps must manage chat token refresh and shared-secret distribution.
 - Task room lookup does not auto-create missing rooms.
 - Task room lookup only checks current room membership; organization/project ACLs are not implemented in this step.
 - The chat UI is still styled by the app-level `frontend/src/styles.css`.
