@@ -192,7 +192,8 @@ Manual checks:
 
 - Open `http://192.168.22.37/chat/`.
 - Verify desktop integration from `time-tracker-desktop`.
-- Verify CORS from the desktop renderer origin.
+- Verify CORS from the desktop renderer origin. In desktop dev mode the actual Electron origin is
+  `http://localhost:5175`; also allow `http://127.0.0.1:5175` when the renderer is loaded through loopback.
 - Verify SSE realtime through `/chat/api/events`.
 - Verify feature-specific chat behavior before merging to `develop`.
 
@@ -314,9 +315,25 @@ The SSE location `/chat/api/events` must keep:
 proxy_http_version 1.1;
 proxy_buffering off;
 proxy_read_timeout 1h;
+proxy_send_timeout 1h;
+proxy_set_header Connection "";
+proxy_set_header Origin $http_origin;
+add_header X-Accel-Buffering no always;
 ```
 
 Reload Nginx with the server's established workflow after validating the host config.
+
+Before desktop smoke, verify that the proxied SSE response echoes the allowed Electron origin:
+
+```bash
+curl -i -N "http://192.168.22.37/chat/api/events?userId=11111111-1111-4111-8111-111111111111" \
+  -H "Origin: http://localhost:5175"
+```
+
+Expected headers include `access-control-allow-origin: http://localhost:5175`,
+`content-type: text/event-stream; charset=utf-8`, `cache-control: no-cache, no-transform`, and
+`x-accel-buffering: no`. If Electron reports `readyState=2` or `TypeError: Failed to fetch` for the SSE URL while
+HTTP API calls still work, treat it as an SSE CORS/header issue first.
 
 ## Rollback Notes
 

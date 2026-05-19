@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { PrismaClient } from '@prisma/client';
 
+import { getCorsResponseHeaders } from '../../config/cors.js';
 import { eventsQuerySchema } from './eventTypes.js';
 import { sseConnectionManager } from './sseConnectionManager.js';
 import type { SseConnectionManager } from './sseConnectionManager.js';
@@ -24,6 +25,7 @@ export const registerEventRoutes = (
       connection: 'keep-alive',
       'content-type': 'text/event-stream; charset=utf-8',
       'x-accel-buffering': 'no',
+      ...getCorsResponseHeaders(request.headers.origin),
     });
     reply.raw.flushHeaders();
     manager.addConnection(user.id, reply.raw);
