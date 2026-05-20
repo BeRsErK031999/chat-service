@@ -15,7 +15,10 @@ import {
   listRoomMessages,
 } from '../messages/messageService.js';
 import { markRoomRead } from '../read-states/readStateService.js';
-import { getAuthenticatedUser, requireDevAuth } from '../../shared/auth/devAuth.js';
+import {
+  authenticateRequest,
+  getAuthenticatedUser,
+} from '../auth/authMiddleware.js';
 import { canReadRoom, canWriteRoom } from './roomPermissions.js';
 import { listRoomsForUser, lookupTaskRoomForUser } from './roomService.js';
 import {
@@ -32,13 +35,13 @@ export const registerRoomRoutes = (
   prisma: PrismaClient,
   eventManager: SseConnectionManager = sseConnectionManager,
 ): void => {
-  app.get('/rooms', { preHandler: requireDevAuth }, async (request) => {
+  app.get('/rooms', { preHandler: authenticateRequest }, async (request) => {
     const user = getAuthenticatedUser(request);
 
     return listRoomsForUser(prisma, user.id);
   });
 
-  app.get('/task-rooms/lookup', { preHandler: requireDevAuth }, async (request) => {
+  app.get('/task-rooms/lookup', { preHandler: authenticateRequest }, async (request) => {
     const user = getAuthenticatedUser(request);
     const query = taskRoomLookupQuerySchema.parse(request.query);
 
@@ -49,7 +52,7 @@ export const registerRoomRoutes = (
     });
   });
 
-  app.get('/rooms/:roomId/messages', { preHandler: requireDevAuth }, async (request) => {
+  app.get('/rooms/:roomId/messages', { preHandler: authenticateRequest }, async (request) => {
     const user = getAuthenticatedUser(request);
     const params = roomIdParamsSchema.parse(request.params);
     const query = roomMessagesQuerySchema.parse(request.query);
@@ -71,7 +74,7 @@ export const registerRoomRoutes = (
     return listRoomMessages(prisma, listInput);
   });
 
-  app.post('/rooms/:roomId/messages', { preHandler: requireDevAuth }, async (request) => {
+  app.post('/rooms/:roomId/messages', { preHandler: authenticateRequest }, async (request) => {
     const user = getAuthenticatedUser(request);
     const params = roomIdParamsSchema.parse(request.params);
     const body = postRoomMessageBodySchema.parse(request.body);
@@ -104,7 +107,7 @@ export const registerRoomRoutes = (
     return result.message;
   });
 
-  app.post('/rooms/:roomId/read', { preHandler: requireDevAuth }, async (request) => {
+  app.post('/rooms/:roomId/read', { preHandler: authenticateRequest }, async (request) => {
     const user = getAuthenticatedUser(request);
     const params = roomIdParamsSchema.parse(request.params);
     const body = markRoomReadBodySchema.parse(request.body);

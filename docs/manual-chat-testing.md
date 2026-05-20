@@ -46,7 +46,7 @@ Deploy from the Windows workstation:
 yarn deploy:server
 ```
 
-Use key-based SSH for deploy. See `docs/server-deploy.md` for `CHAT_SERVICE_DEPLOY_SSH_KEY` setup and the temporary
+Use key-based SSH for deploy. See `docs/server-deploy.md` for `CHAT_SERVICE_DEPLOY_SSH_KEY` setup and the emergency
 password fallback.
 
 Preflight before browser testing:
@@ -159,6 +159,10 @@ The reusable chat UI opens an `EventSource` connection built from the configured
 `/chat/api/events?userId=<current-user-id>` in the playground. The query parameter is for temporary dev auth only;
 production auth should replace it with cookie, JWT, or session-based auth.
 
+The Electron desktop dev renderer is loaded from `http://localhost:5175` during `yarn dev`. That exact origin must be in
+`CHAT_CORS_ALLOWED_ORIGINS` or `CORS_ALLOWED_ORIGINS`, along with `http://127.0.0.1:5175` when the desktop renderer is
+loaded through the loopback address.
+
 1. Open `http://192.168.22.37/chat/` in one browser and select `Artem`.
 2. Open the same URL in another browser or on another PC and select `Tester`.
 3. Confirm both screens show `Realtime connected`.
@@ -169,6 +173,25 @@ production auth should replace it with cookie, JWT, or session-based auth.
 
 If the SSE connection drops, the UI shows `Realtime disconnected, using polling fallback`. Polling still runs, but now
 only as a slower fallback.
+
+Verify SSE headers for the desktop renderer origin:
+
+```bash
+curl -i -N "http://192.168.22.37/chat/api/events?userId=11111111-1111-4111-8111-111111111111" \
+  -H "Origin: http://localhost:5175"
+```
+
+Expected headers:
+
+- `HTTP/1.1 200 OK`
+- `content-type: text/event-stream; charset=utf-8`
+- `access-control-allow-origin: http://localhost:5175`
+- `cache-control: no-cache, no-transform`
+- `x-accel-buffering: no`
+
+If Electron shows `Realtime disconnected, using polling fallback`, `EventSource.readyState` quickly becomes `2`, or a
+renderer probe fails with `TypeError: Failed to fetch` while PowerShell/curl receives `text/event-stream`, check that
+the SSE route writes CORS headers before the stream starts and that nginx forwards `Origin` for `/chat/api/events`.
 
 ## Idempotency Retry Test
 

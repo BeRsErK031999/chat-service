@@ -51,11 +51,11 @@ function Select-Transport {
 
   if (-not [string]::IsNullOrWhiteSpace($env:CHAT_SERVICE_DEPLOY_PASSWORD)) {
     $script:UsePasswordTransport = $true
-    Write-Host "Using password-based SSH transport from CHAT_SERVICE_DEPLOY_PASSWORD as temporary fallback."
+    Write-Host "Using password-based SSH transport from CHAT_SERVICE_DEPLOY_PASSWORD as emergency fallback."
     return
   }
 
-  throw "SSH access failed. Configure key auth or set CHAT_SERVICE_DEPLOY_PASSWORD for temporary fallback."
+  throw "SSH access failed. Configure key auth or set CHAT_SERVICE_DEPLOY_PASSWORD for emergency fallback."
 }
 
 function Invoke-PasswordRemote {

@@ -16,6 +16,8 @@ describe('loadEnv', () => {
       LOG_LEVEL: 'debug',
       DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/chat_service',
       AUTH_MODE: 'integrated',
+      CHAT_INTERNAL_AUTH_SECRET: undefined,
+      CHAT_ALLOW_DEV_USER_ID: true,
     });
   });
 
@@ -29,6 +31,7 @@ describe('loadEnv', () => {
     expect(result.PORT).toBe(3000);
     expect(result.LOG_LEVEL).toBe('info');
     expect(result.AUTH_MODE).toBe('standalone');
+    expect(result.CHAT_ALLOW_DEV_USER_ID).toBe(true);
   });
 
   it('rejects unsupported auth modes', async () => {

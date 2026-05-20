@@ -1,9 +1,1 @@
-export type AuthenticatedUser = {
-  id: string;
-};
-
-declare module 'fastify' {
-  interface FastifyRequest {
-    user?: AuthenticatedUser;
-  }
-}
+export type { AuthenticatedUser } from '../../modules/auth/authTypes.js';

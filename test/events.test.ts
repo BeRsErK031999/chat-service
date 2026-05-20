@@ -2,9 +2,10 @@ import { EventEmitter } from 'node:events';
 import type { ServerResponse } from 'node:http';
 import { MessageType, NotificationDeliveryState, NotificationPriority } from '@prisma/client';
 import type { Message, Notification, Prisma, PrismaClient } from '@prisma/client';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { buildApp } from '../src/app.js';
+import { createChatInternalToken } from '../src/modules/auth/tokenService.js';
 import { publishMessageCreated, publishNotificationCreated } from '../src/modules/events/eventPublisher.js';
 import { SseConnectionManager } from '../src/modules/events/sseConnectionManager.js';
 
@@ -14,6 +15,9 @@ const roomId = '33333333-3333-4333-8333-333333333333';
 const messageId = '44444444-4444-4444-8444-444444444444';
 const notificationId = '55555555-5555-4555-8555-555555555555';
 const now = new Date('2026-05-14T00:00:00.000Z');
+const allowedOrigin = 'http://localhost:5175';
+const disallowedOrigin = 'http://malicious.example';
+const secret = 'test-chat-internal-auth-secret-32-chars-min';
 
 class FakeResponse extends EventEmitter {
   public readonly chunks: string[] = [];
@@ -30,6 +34,31 @@ class FakeResponse extends EventEmitter {
 
 const asServerResponse = (response: FakeResponse): ServerResponse =>
   response as unknown as ServerResponse;
+
+class ClosingSseConnectionManager extends SseConnectionManager {
+  public override addConnection(connectionUserId: string, response: ServerResponse): () => void {
+    expect(connectionUserId).toBe(userId);
+    response.write(': connected\n\n');
+    response.end();
+
+    return () => undefined;
+  }
+}
+
+const buildToken = (): string => {
+  const issuedAt = Math.floor(Date.now() / 1000);
+
+  return createChatInternalToken(
+    {
+      userId,
+      displayName: 'Artem',
+      issuedAt,
+      expiresAt: issuedAt + 900,
+      source: 'desktop',
+    },
+    secret,
+  );
+};
 
 const message: Message = {
   id: messageId,
@@ -78,6 +107,10 @@ const buildPublisherPrisma = (memberIds: string[]): PrismaClient =>
   }) as unknown as PrismaClient;
 
 describe('SSE events', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('rejects /events without user id', async () => {
     const app = await buildApp({
       prismaClient: buildPublisherPrisma([]),
@@ -90,6 +123,81 @@ describe('SSE events', () => {
     });
 
     expect(response.statusCode).toBe(401);
+
+    await app.close();
+  });
+
+  it('returns CORS and stream headers for an allowed SSE dev user origin', async () => {
+    vi.stubEnv('CHAT_ALLOW_DEV_USER_ID', 'true');
+    vi.stubEnv('CHAT_CORS_ALLOWED_ORIGINS', allowedOrigin);
+    const app = await buildApp({
+      prismaClient: buildPublisherPrisma([]),
+      sseManager: new ClosingSseConnectionManager(),
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/events?userId=${userId}`,
+      headers: {
+        origin: allowedOrigin,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['content-type']).toBe('text/event-stream; charset=utf-8');
+    expect(response.headers['cache-control']).toBe('no-cache, no-transform');
+    expect(response.headers['x-accel-buffering']).toBe('no');
+    expect(response.headers['access-control-allow-origin']).toBe(allowedOrigin);
+    expect(response.headers['access-control-allow-credentials']).toBe('true');
+    expect(response.headers.vary).toBe('Origin');
+    expect(response.body).toContain(': connected');
+
+    await app.close();
+  });
+
+  it('does not echo CORS headers for a disallowed SSE origin', async () => {
+    vi.stubEnv('CHAT_ALLOW_DEV_USER_ID', 'true');
+    vi.stubEnv('CHAT_CORS_ALLOWED_ORIGINS', allowedOrigin);
+    const app = await buildApp({
+      prismaClient: buildPublisherPrisma([]),
+      sseManager: new ClosingSseConnectionManager(),
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/events?userId=${userId}`,
+      headers: {
+        origin: disallowedOrigin,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['access-control-allow-origin']).toBeUndefined();
+    expect(response.headers['access-control-allow-credentials']).toBeUndefined();
+
+    await app.close();
+  });
+
+  it('accepts SSE accessToken auth and returns CORS headers for allowed origins', async () => {
+    vi.stubEnv('CHAT_ALLOW_DEV_USER_ID', 'false');
+    vi.stubEnv('CHAT_INTERNAL_AUTH_SECRET', secret);
+    vi.stubEnv('CHAT_CORS_ALLOWED_ORIGINS', allowedOrigin);
+    const app = await buildApp({
+      prismaClient: buildPublisherPrisma([]),
+      sseManager: new ClosingSseConnectionManager(),
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/events?accessToken=${encodeURIComponent(buildToken())}`,
+      headers: {
+        origin: allowedOrigin,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['access-control-allow-origin']).toBe(allowedOrigin);
+    expect(response.body).toContain(': connected');
 
     await app.close();
   });

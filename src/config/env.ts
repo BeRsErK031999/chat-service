@@ -11,6 +11,11 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   DATABASE_URL: z.string().url(),
   AUTH_MODE: authModeSchema.default('standalone'),
+  CHAT_INTERNAL_AUTH_SECRET: z.string().min(32).optional(),
+  CHAT_ALLOW_DEV_USER_ID: z
+    .enum(['true', 'false'])
+    .default(process.env.NODE_ENV === 'production' ? 'false' : 'true')
+    .transform((value) => value === 'true'),
 });
 
 export type Env = z.infer<typeof envSchema>;
