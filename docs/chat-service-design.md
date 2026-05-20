@@ -2,8 +2,14 @@
 
 ## Status
 
-Draft for a future standalone `chat-service`. This document does not describe changes to the current
-`rocket-chat-notification-service` implementation and does not require writing service code in this repository.
+Historical architecture draft for the standalone `chat-service`.
+
+The implemented staging milestone now uses HTTP APIs plus SSE realtime. WebSocket gateway and NATS ingestion/publishing
+remain future-phase ideas, not the current implementation and not a merge requirement for the desktop integration
+milestone.
+
+This document does not describe changes to the current `rocket-chat-notification-service` implementation and does not
+require writing service code in that repository.
 
 ## Goal
 
@@ -11,8 +17,8 @@ The `chat-service` is a standalone Node.js/TypeScript microservice for task-cent
 Its first business purpose is reliable delivery of task notifications to users, including desktop popup
 notifications and realtime room updates.
 
-Rocket.Chat is treated as a temporary notification delivery prototype, not as the final chat core. The target
-service owns chat rooms, messages, read state, unread counters, notification records, and realtime delivery.
+Rocket.Chat is treated as an archived/reference-only notification delivery prototype, not as the final chat core. The
+target service owns chat rooms, messages, read state, unread counters, notification records, and realtime delivery.
 
 ## Migration from Rocket.Chat prototype
 
@@ -40,9 +46,13 @@ The service must support two operating modes:
 - Standalone mode: the service can run with its own local user and membership data for development, testing,
   demos, and possible isolated deployments.
 
-## MVP Scope
+## Original MVP Scope
 
-MVP should cover:
+This section is the original target scope and includes future-phase items. The current merged milestone covers HTTP API,
+PostgreSQL/Prisma persistence, task-room lookup, notifications, unread counters, permissions, idempotency, deploy
+workflow, CORS, and SSE realtime. It does not add NATS or WebSocket runtime.
+
+The broader MVP should cover:
 
 - Task rooms created or resolved from TTS/Gantt task events.
 - System messages generated from task lifecycle events.
@@ -51,10 +61,11 @@ MVP should cover:
 - Message history stored permanently.
 - Per-user read state.
 - Desktop popup notification records and realtime notification events.
-- WebSocket realtime delivery for messages, room changes, read state changes, and notifications.
+- Realtime delivery for messages, room changes, read state changes, and notifications. Current implementation uses SSE;
+  WebSocket remains a later option.
 - HTTP API for room/message/notification access.
-- NATS consumers for task event ingestion.
-- NATS publishers for chat and notification events.
+- NATS consumers for task event ingestion in a later integration phase.
+- NATS publishers for chat and notification events in a later integration phase.
 - PostgreSQL persistence through Prisma.
 - Zod validation at API and event boundaries.
 - pino structured logging.
@@ -82,7 +93,7 @@ The following are explicitly outside MVP:
 - Federation with external chat systems.
 - Mobile push notifications.
 - Retention policies and archival jobs.
-- Docker packaging in the first design/implementation phase.
+- Additional Docker platform changes beyond the current deploy workflow.
 
 ## Architecture
 
@@ -90,9 +101,10 @@ The following are explicitly outside MVP:
 
 - HTTP API: Fastify application exposing authenticated REST endpoints for rooms, messages, read state, and
   notifications.
-- WebSocket gateway: authenticated realtime channel for user-scoped events.
-- NATS consumers: event ingestion from TTS/Gantt subjects such as task status, assignee, deadline, and comments.
-- NATS publishers: outgoing chat domain events for other services and observability pipelines.
+- SSE realtime gateway: authenticated user-scoped event stream for the current milestone.
+- Future WebSocket gateway: optional replacement or supplement for SSE after the integration architecture stabilizes.
+- Future NATS consumers: event ingestion from TTS/Gantt subjects such as task status, assignee, deadline, and comments.
+- Future NATS publishers: outgoing chat domain events for other services and observability pipelines.
 - PostgreSQL persistence: durable storage for users, rooms, memberships, messages, read states, notifications,
   and task-room links.
 - Auth integration: JWT or token introspection against external TTS/auth-service in integrated mode.
@@ -100,14 +112,15 @@ The following are explicitly outside MVP:
 
 ### Runtime Flow
 
-1. TTS/Gantt publishes a task event to NATS.
+1. Current milestone: desktop/browser clients call the HTTP API directly. Future phase: TTS/Gantt publishes a task event
+   to NATS.
 2. `chat-service` validates the event with Zod.
 3. The service resolves the task room set for the task, creating missing rooms when allowed by the event policy.
 4. The service creates a system message in the relevant room.
 5. The service creates notification records for eligible room members.
 6. The service updates unread counters through read state/message sequence comparison.
-7. The service emits WebSocket events to connected users.
-8. The service publishes `chat.message.created` and `chat.notification.created` events.
+7. The service emits SSE events to connected users. Future phase may add WebSocket transport.
+8. Future phase: the service publishes `chat.message.created` and `chat.notification.created` events.
 
 ### HTTP API
 
@@ -121,10 +134,10 @@ The HTTP API is the source of truth for query and command operations:
 API requests use JSON. All request bodies, params, query strings, and response payloads should be validated or
 serialized through explicit schemas.
 
-### WebSocket Gateway
+### Realtime Gateway
 
-The WebSocket gateway provides low-latency delivery, not durable storage. Clients must treat WebSocket events as
-signals and use HTTP APIs to recover missed data after reconnect.
+The current milestone uses SSE for low-latency delivery. A WebSocket gateway remains a future option, not the current
+runtime. Clients must treat realtime events as signals and use HTTP APIs to recover missed data after reconnect.
 
 Connection behavior:
 
@@ -404,7 +417,7 @@ Flow:
 4. Create a `system_event` message with `eventType = task.status.changed`.
 5. Notify assignee, task participants, watchers, and responsible managers except the actor when suppression is
    configured.
-6. Emit `message.created` and `notification.created` over WebSocket.
+6. Emit `message.created` and `notification.created` over SSE. Future phase may add WebSocket transport.
 7. Publish `chat.message.created` and `chat.notification.created`.
 
 ### `task.assignee.changed`
@@ -444,7 +457,7 @@ Flow:
 4. Notify task participants according to notification preferences.
 5. Store external comment id in `eventPayload` for traceability.
 
-## WebSocket Events
+## Realtime Events
 
 All events should include:
 
@@ -714,8 +727,8 @@ Recommended indexes:
 
 - Local permission projection can drift from TTS. Mitigation: idempotent sync events, periodic reconciliation, and
   conservative access checks when membership is uncertain.
-- WebSocket delivery is not durable. Mitigation: clients refresh room/message/notification state via HTTP after
-  reconnect.
+- Realtime delivery is not durable. Mitigation: clients refresh room/message/notification state via HTTP after
+  reconnect. Current transport is SSE; WebSocket remains a later option.
 - Notification fanout can grow as project sizes grow. MVP load is small, but fanout should be isolated behind a
   notification service/domain module and later moved to jobs if needed.
 - Per-room message sequence requires transactional allocation. This is simple for MVP but must be implemented
@@ -749,7 +762,7 @@ Recommended indexes:
 
 ### Phase 3: desktop realtime
 
-- Add WebSocket gateway.
+- Keep SSE gateway stable; evaluate WebSocket only after production auth and integration source strategy are hardened.
 - Stream `message.created`, `room.created`, `room.updated`, `read_state.updated`, and `notification.created`.
 - Add reconnect/recovery behavior through HTTP refresh.
 - Integrate desktop popup client behavior in the consuming TTS shell.
