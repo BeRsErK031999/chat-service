@@ -13,6 +13,7 @@
     "type-check": "tsc --noEmit && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run --root . --exclude test/integration/**",
     "test:integration": "vitest run test/integration",
+    "clean": "node scripts/clean.mjs",
     "prisma:generate": "prisma generate",
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",

@@ -3,7 +3,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'eslint.config.js', 'prettier.config.cjs'],
+    ignores: ['dist/**', 'node_modules/**', 'scripts/clean.mjs', 'eslint.config.js', 'prettier.config.cjs'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
