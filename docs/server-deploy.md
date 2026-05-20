@@ -326,7 +326,7 @@ Reload Nginx with the server's established workflow after validating the host co
 Before desktop smoke, verify that the proxied SSE response echoes the allowed Electron origin:
 
 ```bash
-curl -i -N "http://192.168.22.37/chat/api/events?userId=11111111-1111-4111-8111-111111111111" \
+curl -i -N "http://192.168.22.37/chat/api/events?accessToken=<short-lived-chat-token>" \
   -H "Origin: http://localhost:5175"
 ```
 
@@ -334,6 +334,23 @@ Expected headers include `access-control-allow-origin: http://localhost:5175`,
 `content-type: text/event-stream; charset=utf-8`, `cache-control: no-cache, no-transform`, and
 `x-accel-buffering: no`. If Electron reports `readyState=2` or `TypeError: Failed to fetch` for the SSE URL while
 HTTP API calls still work, treat it as an SSE CORS/header issue first.
+
+## Staging Bearer Smoke - 2026-05-20
+
+Staging was verified with `CHAT_ALLOW_DEV_USER_ID=false`.
+
+- Server `.env` contains `DATABASE_URL`, `CHAT_INTERNAL_AUTH_SECRET`, `CHAT_ALLOW_DEV_USER_ID`, and
+  `CHAT_CORS_ALLOWED_ORIGINS`; real values were not printed.
+- `x-user-id`-only `/chat/api/rooms` returned `401`.
+- `/chat/api/events?userId=<uuid>` returned `401`.
+- Bearer `/chat/api/rooms` accepted a short-lived Electron-main-compatible token.
+- Bearer SSE `/chat/api/events?accessToken=<short-lived-chat-token>` returned `200 OK` and connected.
+- Artem/Tester API smoke exchanged messages with temporary bearer tokens and delivered the Tester reply to Artem over
+  SSE realtime.
+
+The desktop renderer must not know `CHAT_INTERNAL_AUTH_SECRET`. For desktop staging smoke, provide the matching secret
+only through Electron main configuration such as a shell `CHAT_INTERNAL_AUTH_SECRET`. Browser playgrounds that still rely
+on `x-user-id` need bearer support before they can be used for production-style smoke.
 
 ## Rollback Notes
 
