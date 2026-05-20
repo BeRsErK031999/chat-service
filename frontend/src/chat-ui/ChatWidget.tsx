@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactElement } from 'react';
 
 import { ChatApiError } from './api';
+import './chat-widget.css';
 import {
   MessageComposer,
   MessageList,
@@ -96,7 +97,7 @@ export const ChatWidget = ({
     [messages],
   );
 
-  const lastSequence = sortedMessages.at(-1)?.sequence ?? 0;
+  const lastSequence = sortedMessages[sortedMessages.length - 1]?.sequence ?? 0;
 
   useEffect(() => {
     if (taskRoomLookupContext === null) {
@@ -306,14 +307,14 @@ export const ChatWidget = ({
     }
   };
 
-  const shellClassName = ['app-shell', `chat-widget-${mode}`, className].filter(Boolean).join(' ');
+  const shellClassName = ['chat-ui-root', `chat-ui-${mode}`, className].filter(Boolean).join(' ');
 
   return (
     <main className={shellClassName}>
-      <aside className="sidebar">
-        <div className="sidebar-header">
+      <aside className="chat-ui-sidebar">
+        <div className="chat-ui-sidebar-header">
           <div>
-            <p className="eyebrow">User</p>
+            <p className="chat-ui-eyebrow">User</p>
             <strong>{currentUser.displayName}</strong>
           </div>
           {callbacks?.onClose !== undefined ? (
@@ -323,7 +324,7 @@ export const ChatWidget = ({
           ) : null}
         </div>
 
-        <div className="toolbar">
+        <div className="chat-ui-toolbar">
           <button type="button" onClick={() => void refreshAll()}>
             Refresh
           </button>
@@ -340,12 +341,14 @@ export const ChatWidget = ({
         />
       </aside>
 
-      <section className="chat-panel">
-        <header className="chat-header">
+      <section className="chat-ui-chat-panel">
+        <header className="chat-ui-chat-header">
           <div>
-            <p className="eyebrow">Room</p>
+            <p className="chat-ui-eyebrow">Room</p>
             <h2>
-              {selectedRoom !== null ? getRoomLabel(selectedRoom) : (labels?.title ?? 'Select a room')}
+              {selectedRoom !== null
+                ? getRoomLabel(selectedRoom)
+                : (labels?.title ?? 'Select a room')}
             </h2>
           </div>
           <button
@@ -357,7 +360,7 @@ export const ChatWidget = ({
           </button>
         </header>
 
-        {error !== null ? <div className="error-banner">{error}</div> : null}
+        {error !== null ? <div className="chat-ui-error-banner">{error}</div> : null}
 
         <MessageList
           messages={sortedMessages}
