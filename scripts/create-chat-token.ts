@@ -4,10 +4,26 @@ import type { ChatInternalTokenSource } from '../src/modules/auth/authTypes.js';
 const allowedSources = ['desktop', 'web', 'playground'] as const satisfies readonly ChatInternalTokenSource[];
 
 const readOption = (name: string): string | undefined => {
+  const argumentsList = process.argv.slice(2);
   const prefix = `--${name}=`;
-  const match = process.argv.slice(2).find((argument) => argument.startsWith(prefix));
+  const match = argumentsList.find((argument) => argument.startsWith(prefix));
 
-  return match?.slice(prefix.length);
+  if (match !== undefined) {
+    return match.slice(prefix.length);
+  }
+
+  const optionIndex = argumentsList.indexOf(`--${name}`);
+  const nextArgument = argumentsList[optionIndex + 1];
+
+  if (
+    optionIndex !== -1 &&
+    nextArgument !== undefined &&
+    !nextArgument.startsWith('--')
+  ) {
+    return nextArgument;
+  }
+
+  return undefined;
 };
 
 const requireOption = (name: string): string => {

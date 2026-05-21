@@ -365,10 +365,17 @@ Staging was rechecked with `CHAT_ALLOW_DEV_USER_ID=false`.
 - `/chat/api/events?userId=<uuid>` returned `401`.
 - Artem/Tester API smoke used temporary in-memory bearer tokens, exchanged messages in `Direct Chat`, and delivered the
   Tester reply to Artem over SSE through `/chat/api/events?accessToken=<short-lived-chat-token>`.
+- Commit `cb973cb` deployed successfully after restoring key-based SSH with the local staging key.
+- Browser `/chat/` bearer mode was verified with short-lived `source=playground` Artem and Tester tokens: rooms loaded,
+  SSE connected, messages arrived realtime in both directions, and dev-user-id mode returned the expected auth failure
+  while `CHAT_ALLOW_DEV_USER_ID=false`.
+- Desktop + browser playground smoke was attempted, but Electron main could not fetch the trusted desktop identity from
+  the time-tracker dev backend because the HTTPS request failed during TLS negotiation. The renderer secret was not
+  exposed and no renderer-side token fallback was used.
 
 The desktop renderer must not know `CHAT_INTERNAL_AUTH_SECRET`. For desktop staging smoke, provide the matching secret
-only through Electron main configuration such as a shell `CHAT_INTERNAL_AUTH_SECRET`. Browser playgrounds that still rely
-on `x-user-id` need bearer support before they can be used for production-style smoke.
+only through Electron main configuration such as a shell `CHAT_INTERNAL_AUTH_SECRET`. Use playground bearer mode, not
+dev-user-id, for production-style browser smoke.
 
 ## Staging Bearer Smoke - 2026-05-20
 

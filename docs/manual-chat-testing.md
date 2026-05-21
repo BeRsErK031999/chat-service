@@ -308,3 +308,22 @@ curl -i -X POST "http://192.168.22.37/chat/api/notifications/$NOTIFICATION_ID/re
 - Polling fallback refreshes messages, rooms, and notifications when SSE is disconnected or disabled.
 - New user messages create unread backend notifications for other active room members.
 - The layout is intended for desktop internal testing, not mobile use.
+
+## Staging Bearer Playground Smoke - 2026-05-21
+
+Staging was deployed with `CHAT_ALLOW_DEV_USER_ID=false` and the browser playground was checked in bearer mode. Token
+values were not recorded.
+
+- `x-user-id` HTTP auth returned `401`.
+- `/events?userId=<uuid>` returned `401`.
+- Artem and Tester both opened `/chat/` in `Bearer token` mode with short-lived `source=playground` tokens.
+- Both browsers loaded rooms and showed `Realtime connected`.
+- Artem sent a Direct Chat message; Tester received it without waiting for polling.
+- Tester had a backend notification for the Artem message and the playground notification action was available.
+- Tester replied; Artem received the reply without waiting for polling.
+- `Dev user` mode showed the helpful auth error while dev auth was disabled.
+
+Desktop + browser playground smoke was attempted after this browser smoke, but Electron main could not fetch the trusted
+desktop identity from the time-tracker dev backend because the HTTPS request failed during TLS negotiation. The desktop
+renderer also failed to reach the same backend. The renderer was not given `CHAT_INTERNAL_AUTH_SECRET`, and the desktop
+bearer path was not faked.
