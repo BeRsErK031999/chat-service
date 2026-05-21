@@ -24,6 +24,7 @@
     "db:studio": "prisma studio",
     "deploy:server": "powershell -ExecutionPolicy Bypass -File scripts/deploy-server.ps1",
     "deploy:migrate:server": "powershell -ExecutionPolicy Bypass -File scripts/migrate-server.ps1",
+    "chat:token": "tsx scripts/create-chat-token.ts",
     "format": "prettier --write ."
   },
   "dependencies": {

@@ -173,8 +173,8 @@ HTTP requests send:
 Authorization: Bearer <chat-internal-token>
 ```
 
-The token is an HS256 JWT-style token with `userId`, `displayName`, `issuedAt`, `expiresAt`, and `source` (`desktop` or
-`web`). `expiresAt` is required and expired tokens are rejected with `401`.
+The token is an HS256 JWT-style token with `userId`, `displayName`, `issuedAt`, `expiresAt`, and `source` (`desktop`,
+`web`, or `playground`). `expiresAt` is required and expired tokens are rejected with `401`.
 
 For SSE, browser `EventSource` cannot set custom headers. The widget therefore appends the same short-lived token:
 
@@ -241,11 +241,13 @@ The reusable layer owns:
 The playground layer owns:
 
 - Artem and Tester dev user ids
-- the dev user switcher
+- the auth switcher for dev-user-id and manually pasted bearer tokens
 - the `/chat/` internal testing wrapper
 - default playground API base URL from `VITE_API_BASE_URL ?? '/chat/api'`
 
 Dev users must not be imported into `frontend/src/chat-ui`.
+Bearer mode is the production-style smoke path for staging with `CHAT_ALLOW_DEV_USER_ID=false`; the browser never signs
+tokens and never receives `CHAT_INTERNAL_AUTH_SECRET`.
 
 ## Current Limits
 

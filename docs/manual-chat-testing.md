@@ -96,19 +96,41 @@ http://192.168.22.37/chat/
 
 Send the same URL to another person on the office network.
 
-The first screen is the playground user switcher. It selects a dev user and then renders `ChatWidget` with
-`apiBaseUrl="/chat/api"` and the selected `currentUser`.
+The first screen is the playground auth switcher. Use `Bearer token` mode for staging and any environment where
+`CHAT_ALLOW_DEV_USER_ID=false`. The selected Artem/Tester label is only display identity in this mode; the pasted token
+is the real authenticated identity used by the API and SSE.
+
+Use `Dev user` mode only for local/dev backends with `CHAT_ALLOW_DEV_USER_ID=true`. When dev auth is disabled, the
+playground surfaces the `401` auth error instead of silently falling back to `x-user-id`.
+
+## Short-Lived Bearer Token
+
+Generate a short-lived test token from a trusted shell that has the same `CHAT_INTERNAL_AUTH_SECRET` as the target
+backend. The command prints sensitive token output only because the developer explicitly ran it; do not commit, log, or
+share the token.
+
+```powershell
+$env:CHAT_INTERNAL_AUTH_SECRET="<same secret as target backend>"
+yarn chat:token --userId=11111111-1111-4111-8111-111111111111 --displayName=Artem --source=playground --ttl=900
+yarn chat:token --userId=22222222-2222-4222-8222-222222222222 --displayName=Tester --source=playground --ttl=900
+```
+
+Paste the matching token into `/chat/` using `Bearer token` mode. Prefer fresh tokens with short TTLs. Do not paste real
+production secrets into the browser; only paste already-signed short-lived test tokens.
 
 ## Two-Person Test
 
-1. Open `http://192.168.22.37/chat/` in one browser and select `Artem`.
-2. Ask another person to open the same URL and select `Tester`.
-3. Select `Direct Chat`, `Team Room`, or `task-123/internal`.
-4. Send messages from each browser.
-5. Wait a few seconds or click `Refresh`.
-6. Confirm unread counters and last message previews update.
-7. Click `Mark as read` in a room and confirm unread counters clear.
-8. Check the notifications panel and mark notifications read.
+1. Generate short-lived Artem and Tester bearer tokens.
+2. Open `http://192.168.22.37/chat/` in one browser, choose `Bearer token`, select `Artem`, paste the Artem token, and
+   open the playground.
+3. Ask another person to open the same URL, choose `Bearer token`, select `Tester`, paste the Tester token, and open the
+   playground.
+4. Select `Direct Chat`, `Team Room`, or `task-123/internal`.
+5. Send messages from each browser.
+6. Wait a few seconds or click `Refresh`.
+7. Confirm unread counters and last message previews update.
+8. Click `Mark as read` in a room and confirm unread counters clear.
+9. Check the notifications panel and mark notifications read.
 
 ## Task Room Lookup Test
 
@@ -155,21 +177,33 @@ rooms.
 
 ## Realtime SSE Test
 
-The reusable chat UI opens an `EventSource` connection built from the configured `apiBaseUrl`, currently
-`/chat/api/events?userId=<current-user-id>` in the playground. The query parameter is for temporary dev auth only;
-production auth should replace it with cookie, JWT, or session-based auth.
+The reusable chat UI opens an `EventSource` connection built from the configured `apiBaseUrl`.
+
+In bearer mode, the playground passes `auth={{ strategy: "bearer", token }}` into `ChatWidget`, HTTP requests use
+`Authorization: Bearer <token>`, and SSE uses:
+
+```text
+/chat/api/events?accessToken=<short-lived-chat-token>
+```
+
+Browser `EventSource` cannot set custom headers, so the access token query parameter is the current production-style SSE
+transport. Keep token TTL short and avoid logging query strings. WebSocket is not implemented.
+
+In dev-user mode, SSE uses `/chat/api/events?userId=<current-user-id>`. That mode is for local/dev only and requires
+`CHAT_ALLOW_DEV_USER_ID=true`.
 
 The Electron desktop dev renderer is loaded from `http://localhost:5175` during `yarn dev`. That exact origin must be in
 `CHAT_CORS_ALLOWED_ORIGINS` or `CORS_ALLOWED_ORIGINS`, along with `http://127.0.0.1:5175` when the desktop renderer is
 loaded through the loopback address.
 
-1. Open `http://192.168.22.37/chat/` in one browser and select `Artem`.
-2. Open the same URL in another browser or on another PC and select `Tester`.
-3. Confirm both screens show `Realtime connected`.
-4. Select `Direct Chat` in both browsers.
-5. Send a message from `Artem`.
-6. Confirm `Tester` sees the message and notification without waiting for the polling fallback.
-7. Click `Mark read` on the Tester notification and confirm the notifications panel updates.
+1. Generate short-lived Artem and Tester bearer tokens.
+2. Open `http://192.168.22.37/chat/` in one browser with `Bearer token` mode as Artem.
+3. Open the same URL in another browser or on another PC with `Bearer token` mode as Tester.
+4. Confirm both screens show `Realtime connected`.
+5. Select `Direct Chat` in both browsers.
+6. Send a message from `Artem`.
+7. Confirm `Tester` sees the message and notification without waiting for the polling fallback.
+8. Click `Mark read` on the Tester notification and confirm the notifications panel updates.
 
 If the SSE connection drops, the UI shows `Realtime disconnected, using polling fallback`. Polling still runs, but now
 only as a slower fallback.
@@ -177,7 +211,7 @@ only as a slower fallback.
 Verify SSE headers for the desktop renderer origin:
 
 ```bash
-curl -i -N "http://192.168.22.37/chat/api/events?userId=11111111-1111-4111-8111-111111111111" \
+curl -i -N "http://192.168.22.37/chat/api/events?accessToken=<short-lived-chat-token>" \
   -H "Origin: http://localhost:5175"
 ```
 
@@ -269,7 +303,7 @@ curl -i -X POST "http://192.168.22.37/chat/api/notifications/$NOTIFICATION_ID/re
 ## Current MVP Limits
 
 - No WebSocket or Socket.IO.
-- No JWT or production auth.
+- No production login system; bearer tokens are supplied by the host or generated manually for internal testing.
 - No file upload, reactions, typing indicators, edit, or delete.
 - Polling fallback refreshes messages, rooms, and notifications when SSE is disconnected or disabled.
 - New user messages create unread backend notifications for other active room members.

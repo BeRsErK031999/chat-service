@@ -20,7 +20,7 @@ const tokenPayloadSchema = z.object({
   displayName: z.string().min(1),
   issuedAt: z.number().int().positive(),
   expiresAt: z.number().int().positive(),
-  source: z.enum(['desktop', 'web']),
+  source: z.enum(['desktop', 'web', 'playground']),
 });
 
 const encodeBase64Url = (value: Buffer | string): string =>

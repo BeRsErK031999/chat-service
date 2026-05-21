@@ -1,4 +1,4 @@
-export type ChatInternalTokenSource = 'desktop' | 'web';
+export type ChatInternalTokenSource = 'desktop' | 'web' | 'playground';
 
 export type ChatInternalTokenPayload = {
   userId: string;

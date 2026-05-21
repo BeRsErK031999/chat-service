@@ -191,6 +191,7 @@ docker compose run --rm app yarn dev:seed:server
 Manual checks:
 
 - Open `http://192.168.22.37/chat/`.
+- Use `Bearer token` mode when `CHAT_ALLOW_DEV_USER_ID=false`; `Dev user` mode is local/dev only.
 - Verify desktop integration from `time-tracker-desktop`.
 - Verify CORS from the desktop renderer origin. In desktop dev mode the actual Electron origin is
   `http://localhost:5175`; also allow `http://127.0.0.1:5175` when the renderer is loaded through loopback.
@@ -288,12 +289,24 @@ Token payload:
   "displayName": "Artem",
   "issuedAt": 1779120000,
   "expiresAt": 1779120900,
-  "source": "desktop"
+  "source": "playground"
 }
 ```
 
-The service validates HS256 signature and `expiresAt`. Missing auth, invalid signatures, and expired tokens return `401`.
-Room membership and read-state permissions are unchanged.
+Allowed `source` values are `desktop`, `web`, and `playground`. The service validates HS256 signature and `expiresAt`.
+Missing auth, invalid signatures, and expired tokens return `401`. Room membership and read-state permissions are
+unchanged.
+
+For internal playground smoke, generate short-lived tokens from a trusted shell. The token output is sensitive:
+
+```powershell
+$env:CHAT_INTERNAL_AUTH_SECRET="<same secret as target backend>"
+yarn chat:token --userId=11111111-1111-4111-8111-111111111111 --displayName=Artem --source=playground --ttl=900
+yarn chat:token --userId=22222222-2222-4222-8222-222222222222 --displayName=Tester --source=playground --ttl=900
+```
+
+Do not commit/share tokens, do not paste real production secrets into the browser, and do not expose
+`CHAT_INTERNAL_AUTH_SECRET` to frontend builds.
 
 Browser `EventSource` cannot set `Authorization`, so the widget uses:
 
