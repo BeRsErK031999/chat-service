@@ -11,6 +11,10 @@ export const RealtimeStatus = ({ status }: RealtimeStatusProps): ReactElement =>
     return <span className="chat-ui-status">Realtime disabled, using polling fallback</span>;
   }
 
+  if (status === 'connecting') {
+    return <span className="chat-ui-status">Realtime reconnecting...</span>;
+  }
+
   return (
     <span className="chat-ui-status">
       {status === 'connected'

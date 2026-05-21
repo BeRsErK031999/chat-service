@@ -6,6 +6,14 @@ type SseConnection = {
   id: string;
   userId: string;
   response: ServerResponse;
+  lastWriteAt: number;
+};
+
+type SseConnectionManagerOptions = {
+  heartbeatIntervalMs?: number;
+  staleConnectionMs?: number;
+  onUserOnline?: (userId: string) => void;
+  onUserOffline?: (userId: string) => void;
 };
 
 export class SseConnectionManager {
@@ -15,14 +23,39 @@ export class SseConnectionManager {
 
   private heartbeatInterval: NodeJS.Timeout | null = null;
 
+  private readonly heartbeatIntervalMs: number;
+
+  private readonly staleConnectionMs: number;
+
+  private onUserOnline: ((userId: string) => void) | undefined;
+
+  private onUserOffline: ((userId: string) => void) | undefined;
+
+  public constructor(options: SseConnectionManagerOptions = {}) {
+    this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? 25_000;
+    this.staleConnectionMs = options.staleConnectionMs ?? 90_000;
+    this.onUserOnline = options.onUserOnline;
+    this.onUserOffline = options.onUserOffline;
+  }
+
+  public setLifecycleHandlers(handlers: {
+    onUserOnline?: (userId: string) => void;
+    onUserOffline?: (userId: string) => void;
+  }): void {
+    this.onUserOnline = handlers.onUserOnline;
+    this.onUserOffline = handlers.onUserOffline;
+  }
+
   public addConnection(userId: string, response: ServerResponse): () => void {
     const connectionId = String(this.nextConnectionId);
     this.nextConnectionId += 1;
+    const wasOffline = this.getConnectionCount(userId) === 0;
 
     const connection: SseConnection = {
       id: connectionId,
       userId,
       response,
+      lastWriteAt: Date.now(),
     };
 
     const userConnections = this.connectionsByUserId.get(userId) ?? new Map<string, SseConnection>();
@@ -36,7 +69,11 @@ export class SseConnectionManager {
 
     response.on('close', cleanup);
     response.on('error', cleanup);
-    this.writeComment(response, 'connected');
+    this.writeComment(connection, 'connected');
+
+    if (wasOffline) {
+      this.onUserOnline?.(userId);
+    }
 
     return cleanup;
   }
@@ -55,7 +92,7 @@ export class SseConnectionManager {
     const message = this.formatEvent(eventName, payload);
 
     for (const connection of connections.values()) {
-      connection.response.write(message);
+      this.writeConnection(connection, message);
     }
   }
 
@@ -90,10 +127,15 @@ export class SseConnectionManager {
       return;
     }
 
-    connections.delete(connection.id);
+    const hadConnection = connections.delete(connection.id);
+
+    if (!hadConnection) {
+      return;
+    }
 
     if (connections.size === 0) {
       this.connectionsByUserId.delete(connection.userId);
+      this.onUserOffline?.(connection.userId);
     }
 
     if (this.getConnectionCount() === 0) {
@@ -107,12 +149,24 @@ export class SseConnectionManager {
     }
 
     this.heartbeatInterval = setInterval(() => {
+      const now = Date.now();
       for (const connections of this.connectionsByUserId.values()) {
         for (const connection of connections.values()) {
-          this.writeComment(connection.response, 'heartbeat');
+          if (connection.response.destroyed || connection.response.writableEnded) {
+            this.removeConnection(connection);
+            continue;
+          }
+
+          if (now - connection.lastWriteAt > this.staleConnectionMs) {
+            connection.response.end();
+            this.removeConnection(connection);
+            continue;
+          }
+
+          this.writeComment(connection, 'heartbeat');
         }
       }
-    }, 25_000);
+    }, this.heartbeatIntervalMs);
     this.heartbeatInterval.unref();
   }
 
@@ -125,8 +179,18 @@ export class SseConnectionManager {
     this.heartbeatInterval = null;
   }
 
-  private writeComment(response: ServerResponse, comment: string): void {
-    response.write(`: ${comment}\n\n`);
+  private writeComment(connection: SseConnection, comment: string): void {
+    this.writeConnection(connection, `: ${comment}\n\n`);
+  }
+
+  private writeConnection(connection: SseConnection, chunk: string): void {
+    try {
+      connection.response.write(chunk);
+      connection.lastWriteAt = Date.now();
+    } catch {
+      connection.response.end();
+      this.removeConnection(connection);
+    }
   }
 
   private formatEvent<TEventName extends ServerEventName>(

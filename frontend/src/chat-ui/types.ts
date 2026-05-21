@@ -47,6 +47,13 @@ export type Message = {
   updatedAt: string;
 };
 
+export type LocalMessage = Message & {
+  clientState: 'pending' | 'error';
+  idempotencyKey: string;
+};
+
+export type ChatMessage = Message | LocalMessage;
+
 export type RoomListItem = {
   id: string;
   type: RoomType;
@@ -76,7 +83,7 @@ export type Notification = {
   updatedAt: string;
 };
 
-export type RealtimeStatus = 'disabled' | 'disconnected' | 'connected';
+export type RealtimeStatus = 'disabled' | 'connecting' | 'disconnected' | 'connected';
 
 export type TaskRoomLookupResult = {
   roomId: string;

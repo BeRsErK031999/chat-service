@@ -189,6 +189,15 @@
   background: #edf8f5;
 }
 
+.chat-ui-message-pending {
+  opacity: 0.72;
+}
+
+.chat-ui-message-error {
+  border-color: #ce5a46;
+  background: #fff1ee;
+}
+
 .chat-ui-message p,
 .chat-ui-notification p {
   margin: 6px 0 0;
@@ -234,6 +243,12 @@
 
 .chat-ui-notification button {
   justify-self: start;
+}
+
+.chat-ui-message button {
+  margin-top: 8px;
+  min-height: 30px;
+  border-radius: 6px;
 }
 
 .chat-ui-error-banner {

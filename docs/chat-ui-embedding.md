@@ -234,9 +234,12 @@ The reusable layer owns:
 - `ChatWidget`
 - host-facing public types
 - API client creation from `apiBaseUrl` and `auth`
-- SSE realtime hook with connected/disconnected state callback
-- polling fallback refresh trigger
+- SSE realtime hook with connecting/connected/disconnected state callback
+- polling fallback refresh trigger, browser online recovery, and bfcache `pageshow` recovery
+- duplicate realtime event protection for message, notification, and room-read refreshes
 - room list, message list, composer, notifications panel, and realtime status components
+- optimistic message send state with retry using the original `Idempotency-Key`
+- lightweight presence events over the existing SSE connection
 
 The playground layer owns:
 
@@ -256,4 +259,5 @@ tokens and never receives `CHAT_INTERNAL_AUTH_SECRET`.
 - Task room lookup only checks current room membership; organization/project ACLs are not implemented in this step.
 - The chat UI is still styled by the app-level `frontend/src/styles.css`.
 - SSE remains the realtime transport; WebSocket is intentionally not added.
+- Presence uses in-process SSE connection state plus `User.lastSeenAt`; it is not a durable global fanout layer.
 - No desktop shell or web gantt integration exists yet.

@@ -9,12 +9,22 @@ import {
   authenticateSseRequest,
   getAuthenticatedUser,
 } from '../auth/authMiddleware.js';
+import { publishPresenceChanged } from '../presence/presenceService.js';
 
 export const registerEventRoutes = (
   app: FastifyInstance,
-  _prisma: PrismaClient,
+  prisma: PrismaClient,
   manager: SseConnectionManager = sseConnectionManager,
 ): void => {
+  manager.setLifecycleHandlers({
+    onUserOnline: (userId) => {
+      void publishPresenceChanged(prisma, userId, 'online', manager).catch(() => undefined);
+    },
+    onUserOffline: (userId) => {
+      void publishPresenceChanged(prisma, userId, 'offline', manager).catch(() => undefined);
+    },
+  });
+
   app.get('/events', { preHandler: authenticateSseRequest }, async (request, reply) => {
     eventsQuerySchema.parse(request.query);
     const user = getAuthenticatedUser(request);

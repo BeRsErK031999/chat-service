@@ -8,6 +8,7 @@ import { buildApp } from '../src/app.js';
 import { createChatInternalToken } from '../src/modules/auth/tokenService.js';
 import { publishMessageCreated, publishNotificationCreated } from '../src/modules/events/eventPublisher.js';
 import { SseConnectionManager } from '../src/modules/events/sseConnectionManager.js';
+import { publishPresenceChanged } from '../src/modules/presence/presenceService.js';
 
 const userId = '11111111-1111-4111-8111-111111111111';
 const otherUserId = '22222222-2222-4222-8222-222222222222';
@@ -102,6 +103,31 @@ const buildPublisherPrisma = (memberIds: string[]): PrismaClient =>
         });
 
         return Promise.resolve(memberIds.map((memberId) => ({ userId: memberId })));
+      },
+    },
+  }) as unknown as PrismaClient;
+
+const buildPresencePrisma = (): PrismaClient =>
+  ({
+    user: {
+      update: (args: Prisma.UserUpdateArgs) => {
+        expect(args.where).toEqual({
+          id: userId,
+        });
+        expect(args.data).toHaveProperty('lastSeenAt');
+
+        return Promise.resolve({
+          id: userId,
+        });
+      },
+    },
+    roomMember: {
+      findMany: (args: Prisma.RoomMemberFindManyArgs) => {
+        if ('userId' in (args.where ?? {})) {
+          return Promise.resolve([{ roomId }]);
+        }
+
+        return Promise.resolve([{ userId }, { userId: otherUserId }]);
       },
     },
   }) as unknown as PrismaClient;
@@ -240,5 +266,39 @@ describe('SSE events', () => {
     expect(manager.getConnectionCount(userId)).toBe(1);
     response.emit('close');
     expect(manager.getConnectionCount(userId)).toBe(0);
+  });
+
+  it('fires lifecycle callbacks only on online and offline transitions', () => {
+    const onlineUserIds: string[] = [];
+    const offlineUserIds: string[] = [];
+    const manager = new SseConnectionManager({
+      onUserOnline: (connectionUserId) => onlineUserIds.push(connectionUserId),
+      onUserOffline: (connectionUserId) => offlineUserIds.push(connectionUserId),
+    });
+    const firstResponse = new FakeResponse();
+    const secondResponse = new FakeResponse();
+
+    manager.addConnection(userId, asServerResponse(firstResponse));
+    manager.addConnection(userId, asServerResponse(secondResponse));
+    firstResponse.emit('close');
+    secondResponse.emit('close');
+
+    expect(onlineUserIds).toEqual([userId]);
+    expect(offlineUserIds).toEqual([userId]);
+  });
+
+  it('publishes presence changes to users sharing active rooms', async () => {
+    const manager = new SseConnectionManager();
+    const userResponse = new FakeResponse();
+    const otherUserResponse = new FakeResponse();
+    manager.addConnection(userId, asServerResponse(userResponse));
+    manager.addConnection(otherUserId, asServerResponse(otherUserResponse));
+
+    await publishPresenceChanged(buildPresencePrisma(), userId, 'online', manager);
+
+    expect(userResponse.chunks.join('')).toContain('event: presence.changed');
+    expect(userResponse.chunks.join('')).toContain('"status":"online"');
+    expect(otherUserResponse.chunks.join('')).toContain('event: presence.changed');
+    manager.closeAll();
   });
 });

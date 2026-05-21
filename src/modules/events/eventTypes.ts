@@ -27,6 +27,11 @@ export type ServerEventMap = {
     roomId: string;
     userId: string;
   };
+  'presence.changed': {
+    userId: string;
+    status: 'online' | 'offline';
+    lastSeenAt: string;
+  };
 };
 
 export type ServerEventName = keyof ServerEventMap;

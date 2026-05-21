@@ -13,7 +13,15 @@ import {
 } from './components';
 import { useChatClient } from './hooks/useChatClient';
 import { useChatRealtime } from './hooks/useChatRealtime';
-import type { ChatWidgetAuth, ChatWidgetProps, Message, Notification, RoomListItem } from './types';
+import type {
+  ChatMessage,
+  ChatWidgetAuth,
+  ChatWidgetProps,
+  LocalMessage,
+  Message,
+  Notification,
+  RoomListItem,
+} from './types';
 
 const toError = (caughtError: unknown, fallback: string): Error =>
   caughtError instanceof Error ? caughtError : new Error(fallback);
@@ -55,6 +63,7 @@ export const ChatWidget = ({
   const [rooms, setRooms] = useState<RoomListItem[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(requestedRoomId);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [pendingMessages, setPendingMessages] = useState<LocalMessage[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [draft, setDraft] = useState('');
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
@@ -92,12 +101,15 @@ export const ChatWidget = ({
     [rooms, selectedRoomId],
   );
 
-  const sortedMessages = useMemo(
-    () => [...messages].sort((left, right) => left.sequence - right.sequence),
-    [messages],
+  const visibleMessages = useMemo<ChatMessage[]>(
+    () =>
+      [...messages, ...pendingMessages]
+        .filter((message) => message.roomId === selectedRoomId)
+        .sort((left, right) => left.sequence - right.sequence),
+    [messages, pendingMessages, selectedRoomId],
   );
 
-  const lastSequence = sortedMessages[sortedMessages.length - 1]?.sequence ?? 0;
+  const lastSequence = visibleMessages[visibleMessages.length - 1]?.sequence ?? 0;
 
   useEffect(() => {
     if (taskRoomLookupContext === null) {
@@ -192,6 +204,13 @@ export const ChatWidget = ({
     try {
       const nextMessages = await client.getMessages(selectedRoomId);
       setMessages(nextMessages);
+      setPendingMessages((currentMessages) =>
+        currentMessages.filter(
+          (message) =>
+            message.roomId !== selectedRoomId ||
+            !nextMessages.some((serverMessage) => serverMessage.id === message.id),
+        ),
+      );
       setError(null);
     } catch (caughtError) {
       setError(reportError(caughtError, 'Failed to load messages.', true));
@@ -265,6 +284,36 @@ export const ChatWidget = ({
     callbacks?.onRoomChange?.(selectedRoomId);
   }, [callbacks, selectedRoomId]);
 
+  const sendDraft = async (body: string, idempotencyKey: string, localMessageId: string): Promise<void> => {
+    if (selectedRoomId === null) {
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const sentMessage = await client.sendMessage(selectedRoomId, body, idempotencyKey);
+      callbacks?.onMessageSent?.(sentMessage);
+      setPendingMessages((currentMessages) =>
+        currentMessages.filter((message) => message.id !== localMessageId),
+      );
+      await refreshAll();
+    } catch (caughtError) {
+      setPendingMessages((currentMessages) =>
+        currentMessages.map((message) =>
+          message.id === localMessageId
+            ? {
+                ...message,
+                clientState: 'error',
+              }
+            : message,
+        ),
+      );
+      setError(reportError(caughtError, 'Failed to send message.', true));
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   const handleSend = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
 
@@ -272,17 +321,54 @@ export const ChatWidget = ({
       return;
     }
 
-    setIsSending(true);
-    try {
-      const sentMessage = await client.sendMessage(selectedRoomId, draft.trim());
-      callbacks?.onMessageSent?.(sentMessage);
-      setDraft('');
-      await refreshAll();
-    } catch (caughtError) {
-      setError(reportError(caughtError, 'Failed to send message.', true));
-    } finally {
-      setIsSending(false);
+    const body = draft.trim();
+    const idempotencyKey = client.createMessageIdempotencyKey();
+    const localMessageId = `local-${idempotencyKey}`;
+    const localSequence = lastSequence + 1;
+    const now = new Date().toISOString();
+
+    setPendingMessages((currentMessages) => [
+      ...currentMessages,
+      {
+        id: localMessageId,
+        roomId: selectedRoomId,
+        senderUserId: currentUser.id,
+        type: 'TEXT',
+        body,
+        eventType: null,
+        eventPayload: {},
+        sourceEventId: null,
+        sequence: localSequence,
+        createdAt: now,
+        updatedAt: now,
+        clientState: 'pending',
+        idempotencyKey,
+      },
+    ]);
+    setDraft('');
+
+    await sendDraft(body, idempotencyKey, localMessageId);
+  };
+
+  const handleRetryMessage = async (messageId: string): Promise<void> => {
+    const message = pendingMessages.find((item) => item.id === messageId);
+
+    if (message === undefined || message.body === null) {
+      return;
     }
+
+    setPendingMessages((currentMessages) =>
+      currentMessages.map((item) =>
+        item.id === messageId
+          ? {
+              ...item,
+              clientState: 'pending',
+            }
+          : item,
+      ),
+    );
+
+    await sendDraft(message.body, message.idempotencyKey, message.id);
   };
 
   const handleMarkRoomRead = async (): Promise<void> => {
@@ -363,10 +449,11 @@ export const ChatWidget = ({
         {error !== null ? <div className="chat-ui-error-banner">{error}</div> : null}
 
         <MessageList
-          messages={sortedMessages}
+          messages={visibleMessages}
           selectedRoom={selectedRoom}
           currentUserId={currentUser.id}
           isLoading={isLoadingMessages}
+          onRetryMessage={(messageId) => void handleRetryMessage(messageId)}
           messagesEmptyLabel={labels?.messagesEmpty}
           selectRoomEmptyLabel={labels?.selectRoomEmpty}
         />
