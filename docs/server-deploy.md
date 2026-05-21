@@ -335,6 +335,28 @@ Expected headers include `access-control-allow-origin: http://localhost:5175`,
 `x-accel-buffering: no`. If Electron reports `readyState=2` or `TypeError: Failed to fetch` for the SSE URL while
 HTTP API calls still work, treat it as an SSE CORS/header issue first.
 
+## Staging Bearer Smoke - 2026-05-21
+
+Staging was rechecked with `CHAT_ALLOW_DEV_USER_ID=false`.
+
+- Server `.env` contains `DATABASE_URL`, `CHAT_INTERNAL_AUTH_SECRET`, `CHAT_ALLOW_DEV_USER_ID`, and
+  `CHAT_CORS_ALLOWED_ORIGINS`; real values were not printed.
+- `CHAT_INTERNAL_AUTH_SECRET` was already present, so no new secret was generated.
+- `CHAT_ALLOW_DEV_USER_ID=false` was already set, and required desktop origins were present.
+- `yarn prisma:generate`, `yarn type-check`, `yarn lint`, `yarn test`, and `yarn build` passed before deploy.
+- `yarn deploy:server` used key-based SSH. The first attempt failed because Docker Desktop was not running locally; after
+  starting Docker Desktop, deploy succeeded and recreated the app/playground containers.
+- No Prisma migrations were run.
+- External `/chat/api/health` returned `{"status":"ok"}`.
+- `x-user-id`-only `/chat/api/rooms` returned `401`.
+- `/chat/api/events?userId=<uuid>` returned `401`.
+- Artem/Tester API smoke used temporary in-memory bearer tokens, exchanged messages in `Direct Chat`, and delivered the
+  Tester reply to Artem over SSE through `/chat/api/events?accessToken=<short-lived-chat-token>`.
+
+The desktop renderer must not know `CHAT_INTERNAL_AUTH_SECRET`. For desktop staging smoke, provide the matching secret
+only through Electron main configuration such as a shell `CHAT_INTERNAL_AUTH_SECRET`. Browser playgrounds that still rely
+on `x-user-id` need bearer support before they can be used for production-style smoke.
+
 ## Staging Bearer Smoke - 2026-05-20
 
 Staging was verified with `CHAT_ALLOW_DEV_USER_ID=false`.

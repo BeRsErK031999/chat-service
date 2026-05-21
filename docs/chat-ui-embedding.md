@@ -191,9 +191,10 @@ Dev compatibility remains available only when the backend has `CHAT_ALLOW_DEV_US
 
 Set `CHAT_ALLOW_DEV_USER_ID=false` in production.
 
-Staging bearer smoke on 2026-05-20 used `CHAT_ALLOW_DEV_USER_ID=false`: `x-user-id` HTTP auth and
-`/events?userId=<uuid>` both returned `401`, while bearer HTTP and bearer SSE via `accessToken` worked. Browser
-playgrounds that still depend on dev-user-id need bearer support before they can act as a production-style smoke client.
+Staging bearer smoke on 2026-05-21 used `CHAT_ALLOW_DEV_USER_ID=false`: `x-user-id` HTTP auth and
+`/events?userId=<uuid>` both returned `401`, while bearer HTTP and bearer SSE via `accessToken` worked. The desktop
+renderer did not receive `CHAT_INTERNAL_AUTH_SECRET`; Electron main signed the short-lived token. Browser playgrounds
+that still depend on dev-user-id need bearer support before they can act as a production-style smoke client.
 
 ## Room Context
 
