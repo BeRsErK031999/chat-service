@@ -261,3 +261,22 @@ tokens and never receives `CHAT_INTERNAL_AUTH_SECRET`.
 - SSE remains the realtime transport; WebSocket is intentionally not added.
 - Presence uses in-process SSE connection state plus `User.lastSeenAt`; it is not a durable global fanout layer.
 - No desktop shell or web gantt integration exists yet.
+
+## Staging Presence/Reconnection Smoke on 2026-05-22
+
+Staging was redeployed from commit `1ea2df0046453a058b8ec173e3548d6fe5c55387` and `/chat/api/health` returned
+`{"status":"ok"}`. Production-style auth stayed intact: `x-user-id` `/rooms` and `/events?userId=<uuid>` returned
+`401`, while short-lived bearer tokens loaded `/rooms` and connected to `/events?accessToken=<token>`.
+
+The live API/SSE smoke passed:
+
+- `presence.changed` online was emitted when Artem opened an SSE stream and was seen by Tester.
+- Two concurrent Artem SSE streams did not emit a false offline when only one stream closed.
+- Closing the remaining Artem stream emitted offline and updated `User.lastSeenAt`.
+- Desktop-source Artem and playground-source Tester bearer clients exchanged messages through `Direct Chat`.
+- `message.created`, `notification.created`, and `room.read` arrived over SSE.
+- Reusing the same `Idempotency-Key` for a retry returned the same message id and left only one message copy.
+- Restarting the staging app container closed the old SSE stream, `/health` recovered, `/rooms` stayed available, and a
+  new bearer SSE stream connected.
+
+No WebSocket, NATS, Redis presence, Kubernetes, or durable fanout layer was needed for this phase.
