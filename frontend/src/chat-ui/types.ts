@@ -91,6 +91,25 @@ export type ChatWidgetNavigationTarget = {
 
 export type RealtimeStatus = 'disabled' | 'connecting' | 'disconnected' | 'connected';
 
+export type ChatRealtimeDiagnosticKind =
+  | 'connect_start'
+  | 'connected'
+  | 'disconnected'
+  | 'cleanup'
+  | 'event_received'
+  | 'duplicate_event'
+  | 'parse_error'
+  | 'reconnect_requested'
+  | 'polling_refresh';
+
+export type ChatRealtimeDiagnostic = {
+  kind: ChatRealtimeDiagnosticKind;
+  status: RealtimeStatus;
+  timestamp: string;
+  eventName?: string;
+  selectedRoomId?: string | null;
+};
+
 export type PresenceStatus = 'online' | 'offline';
 
 export type PresenceState = {
@@ -116,6 +135,7 @@ export type ChatWidgetCallbacks = {
   onAuthError?: (error: Error) => void;
   onAccessDenied?: (error: Error) => void;
   onRealtimeStatusChange?: (status: RealtimeStatus) => void;
+  onRealtimeDiagnostic?: (diagnostic: ChatRealtimeDiagnostic) => void;
   onClose?: () => void;
 };
 

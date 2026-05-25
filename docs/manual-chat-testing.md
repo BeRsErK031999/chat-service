@@ -235,6 +235,17 @@ loaded through the loopback address.
 If the SSE connection drops, the UI shows `Realtime disconnected, using polling fallback`. Polling still runs, but now
 only as a slower fallback.
 
+For long-session checks, keep one browser or desktop panel open for at least 60 minutes and repeat room switching,
+search focus, notification reads, overlay close/open, and message send/retry flows. Realtime should not flicker from
+room switching alone. Browser DevTools should show one active EventSource stream for the widget; opening a second
+browser tab or a second Electron panel may create a separate stream, but closing it should remove only that stream.
+
+When temporary diagnostics are needed, wire `callbacks.onRealtimeDiagnostic` in the host/playground and count sanitized
+events such as `connect_start`, `connected`, `disconnected`, `cleanup`, `duplicate_event`, `parse_error`,
+`reconnect_requested`, and `polling_refresh`. Do not log bearer tokens, SSE URLs, query strings, request headers,
+message bodies, notification bodies, or user display names. The diagnostic payload is designed to contain only kind,
+status, timestamp, optional event name, and selected room id.
+
 Verify SSE headers for the desktop renderer origin:
 
 ```bash

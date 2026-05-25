@@ -439,6 +439,7 @@ export const ChatWidget = ({
     onNotificationsRefresh: triggerNotificationsRefresh,
     onPresenceRefresh: updatePresence,
     onRealtimeStatusChange: callbacks?.onRealtimeStatusChange,
+    onRealtimeDiagnostic: callbacks?.onRealtimeDiagnostic,
   });
 
   const currentUserPresence = useMemo<PresenceState>(
