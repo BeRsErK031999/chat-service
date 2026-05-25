@@ -245,12 +245,35 @@ For long-session checks, keep one browser or desktop panel open for at least 60 
 search focus, notification reads, overlay close/open, and message send/retry flows. Realtime should not flicker from
 room switching alone. Browser DevTools should show one active EventSource stream for the widget; opening a second
 browser tab or a second Electron panel may create a separate stream, but closing it should remove only that stream.
+Use the checklist helper for a repeatable stress sequence:
+
+```powershell
+yarn chat:realtime-stress-checklist
+```
 
 When temporary diagnostics are needed, wire `callbacks.onRealtimeDiagnostic` in the host/playground and count sanitized
-events such as `connect_start`, `connected`, `disconnected`, `cleanup`, `duplicate_event`, `parse_error`,
-`reconnect_requested`, and `polling_refresh`. Do not log bearer tokens, SSE URLs, query strings, request headers,
-message bodies, notification bodies, or user display names. The diagnostic payload is designed to contain only kind,
-status, timestamp, optional event name, and selected room id.
+events such as `connect_start`, `connected`, `disconnected`, `cleanup`, `duplicate_connection_prevented`,
+`duplicate_event`, `parse_error`, `reconnect_requested`, `reconnect_succeeded`, `reconnect_failed`, `room_switched`, and
+`polling_refresh`. Do not log bearer tokens, SSE URLs, query strings, request headers, message bodies, notification
+bodies, or user display names. The diagnostic payload is designed to contain only kind, status, timestamp, optional
+event name, selected room id, lifecycle counters, last connect/disconnect timestamps, reconnect reason, room count, and
+unread count.
+
+Expected healthy lifecycle:
+
+- initial open emits `connect_start` then `connected`;
+- `activeEventSourceCount` is `1` while one widget instance is visible;
+- repeated room switching only increases `roomSwitchCount`;
+- overlay close emits `cleanup` and reopen creates a fresh connection;
+- reconnect interruption moves through `disconnected`, then `connected`, and does not duplicate messages,
+  notifications, unread counts, or pending sends.
+
+Unhealthy lifecycle:
+
+- `activeEventSourceCount` grows above `1` for one widget instance;
+- reconnect attempts continue after network recovery;
+- room switching causes EventSource recreation;
+- diagnostics include access tokens, secrets, URLs, headers, bodies, or display names.
 
 Verify SSE headers for the desktop renderer origin:
 

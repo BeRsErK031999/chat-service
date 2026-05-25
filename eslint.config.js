@@ -9,6 +9,7 @@ export default tseslint.config(
       'scripts/clean.mjs',
       'scripts/check-chat-env.cjs',
       'scripts/print-chat-smoke-checklist.cjs',
+      'scripts/print-realtime-stress-checklist.cjs',
       'eslint.config.js',
       'prettier.config.cjs',
     ],

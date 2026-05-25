@@ -305,7 +305,8 @@ The reusable layer owns:
 - API client creation from `apiBaseUrl` and `auth`
 - SSE realtime hook with connecting/connected/disconnected state callback
 - stable `EventSource` lifecycle across room switching through refs for selected room and refresh handlers
-- sanitized realtime diagnostics callback for opt-in smoke logging without tokens, URLs, headers, names, or bodies
+- sanitized realtime diagnostics callback for opt-in smoke logging without tokens, URLs, headers, names, bodies, or
+  secrets; payloads may include lifecycle counters, reconnect timestamps, reconnect reason, room count, and unread count
 - polling fallback refresh trigger, browser online recovery, and bfcache `pageshow` recovery
 - duplicate realtime event protection for message, notification, and room-read refreshes
 - room list, message list, composer, notifications panel, and realtime status components

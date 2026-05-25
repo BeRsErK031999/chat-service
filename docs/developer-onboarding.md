@@ -191,6 +191,7 @@ yarn test
 yarn build
 yarn check:chat-env
 yarn chat:smoke-checklist
+yarn chat:realtime-stress-checklist
 git diff --check
 git status --short --branch
 ```
@@ -203,6 +204,10 @@ correct.
 
 `yarn chat:smoke-checklist` prints the manual pre-deploy, API/SSE, desktop visual smoke, security grep, and limitation
 checklist. It does not execute requests, open Electron, deploy, or require credentials.
+
+`yarn chat:realtime-stress-checklist` prints the long-session reconnect and overlay stress sequence. Use it when
+checking EventSource accumulation, room-switch behavior, overlay reopen recovery, reconnect counters, and safe
+diagnostic review. It is also read-only and does not require secrets.
 
 When desktop docs or runtime files changed:
 

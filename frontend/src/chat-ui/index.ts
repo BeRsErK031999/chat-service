@@ -10,6 +10,8 @@ export type {
   ChatWidgetProps,
   ChatWidgetRoomScope,
   ChatWidgetUser,
+  ChatRealtimeDiagnostic,
+  ChatRealtimeDiagnosticKind,
   Message,
   MessageType,
   Notification,

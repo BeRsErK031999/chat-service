@@ -98,8 +98,12 @@ export type ChatRealtimeDiagnosticKind =
   | 'cleanup'
   | 'event_received'
   | 'duplicate_event'
+  | 'duplicate_connection_prevented'
   | 'parse_error'
   | 'reconnect_requested'
+  | 'reconnect_succeeded'
+  | 'reconnect_failed'
+  | 'room_switched'
   | 'polling_refresh';
 
 export type ChatRealtimeDiagnostic = {
@@ -108,6 +112,18 @@ export type ChatRealtimeDiagnostic = {
   timestamp: string;
   eventName?: string;
   selectedRoomId?: string | null;
+  activeEventSourceCount?: number;
+  reconnectAttemptCount?: number;
+  reconnectSuccessCount?: number;
+  reconnectFailureCount?: number;
+  cleanupCount?: number;
+  duplicateConnectionPreventionCount?: number;
+  roomSwitchCount?: number;
+  lastConnectedAt?: string;
+  lastDisconnectedAt?: string;
+  lastReconnectReason?: 'online' | 'pageshow' | 'eventsource-error';
+  roomCount?: number;
+  unreadCount?: number;
 };
 
 export type PresenceStatus = 'online' | 'offline';

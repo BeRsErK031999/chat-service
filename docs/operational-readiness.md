@@ -28,6 +28,7 @@ Use this gate before promoting `develop` to `main` or before treating a staging 
    yarn build
    yarn check:chat-env
    yarn chat:smoke-checklist
+   yarn chat:realtime-stress-checklist
    git diff --check
    ```
 
@@ -37,6 +38,8 @@ Use this gate before promoting `develop` to `main` or before treating a staging 
      explicit CORS origin presence, dev-user-id mode, and Private Network Access documentation/code presence.
    - `yarn chat:smoke-checklist` prints the pre-deploy, post-deploy API/SSE, native desktop, security grep, and known
      limitation checklist.
+   - `yarn chat:realtime-stress-checklist` prints the long-session room switching, overlay reopen, reconnect cycle, and
+     safe diagnostic review flow.
    - Neither helper prints secret values, makes network requests, deploys, opens Electron, or proves that staging is
      reachable.
 
@@ -160,14 +163,37 @@ Allowed diagnostics are sanitized lifecycle events such as:
 - `connected`
 - `disconnected`
 - `cleanup`
+- `duplicate_connection_prevented`
 - `duplicate_event`
 - `parse_error`
 - `reconnect_requested`
+- `reconnect_succeeded`
+- `reconnect_failed`
+- `room_switched`
 - `polling_refresh`
 
-Diagnostic payloads must stay limited to kind, status, timestamp, optional event name, and selected room id. Do not log
-SSE URLs, query strings, bearer tokens, request headers, message bodies, notification bodies, user display names, or
-secrets.
+Diagnostic payloads must stay limited to kind, status, timestamp, optional event name, selected room id, lifecycle
+counters, last connect/disconnect timestamps, reconnect reason, room count, and unread count. Do not log SSE URLs, query
+strings, bearer tokens, request headers, message bodies, notification bodies, user display names, or secrets.
+
+Healthy long-session signals:
+
+- one visible widget reports `activeEventSourceCount=1` after connect;
+- ordinary room switches emit `room_switched` without increasing EventSource count;
+- overlay close emits `cleanup`, and reopen returns to `connect_start` then `connected`;
+- temporary network loss increments reconnect attempt/failure counters, then recovery increments success and refreshes
+  rooms, messages, and notifications;
+- duplicate events may be reported, but they should not duplicate visible messages, notifications, unread counts, or
+  pending sends.
+
+Unhealthy signals:
+
+- `activeEventSourceCount` grows above `1` for one widget instance;
+- reconnect diagnostics repeat continuously after network recovery;
+- room switching alone creates reconnect churn;
+- close/reopen loses the last relevant room, unread continuity, or notification routing;
+- diagnostics include tokens, URLs with `accessToken`, Authorization headers, cookies, message bodies, notification
+  bodies, secrets, or display names.
 
 ## Rollback Checklist
 
@@ -186,6 +212,7 @@ Fast application rollback:
    yarn test
    yarn build
    yarn check:chat-env
+   yarn chat:realtime-stress-checklist
    git diff --check
    ```
 

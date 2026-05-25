@@ -99,6 +99,7 @@ export const ChatWidget = ({
   const [error, setError] = useState<string | null>(null);
   const lastUnreadCountRef = useRef<number | null>(null);
   const lastRoomChangeRef = useRef<string | null | undefined>(undefined);
+  const roomSwitchCountRef = useRef(0);
   const deniedRoomIdRef = useRef<string | null>(null);
   const lastNavigationTargetIdRef = useRef<string | null>(null);
   const notificationIdsRef = useRef<Set<string>>(new Set());
@@ -472,9 +473,21 @@ export const ChatWidget = ({
       return;
     }
 
+    roomSwitchCountRef.current += 1;
     lastRoomChangeRef.current = selectedRoomId;
     callbacks?.onRoomChange?.(selectedRoomId);
-  }, [callbacks, selectedRoomId]);
+    callbacks?.onRealtimeDiagnostic?.({
+      kind: 'room_switched',
+      status: realtimeStatus,
+      timestamp: new Date().toISOString(),
+      selectedRoomId,
+      roomSwitchCount: roomSwitchCountRef.current,
+      roomCount: rooms.length,
+      unreadCount:
+        rooms.reduce((total, room) => total + room.unreadCount, 0) +
+        notifications.filter((notification) => notification.readAt === null).length,
+    });
+  }, [callbacks, notifications, realtimeStatus, rooms, selectedRoomId]);
 
   useEffect(() => {
     if (selectedRoom === null || !isTaskRoom(selectedRoom)) {
