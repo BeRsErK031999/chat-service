@@ -47,6 +47,13 @@ export type Message = {
   updatedAt: string;
 };
 
+export type LocalMessage = Message & {
+  clientState: 'pending' | 'error';
+  idempotencyKey: string;
+};
+
+export type ChatMessage = Message | LocalMessage;
+
 export type RoomListItem = {
   id: string;
   type: RoomType;
@@ -76,7 +83,39 @@ export type Notification = {
   updatedAt: string;
 };
 
-export type RealtimeStatus = 'disabled' | 'disconnected' | 'connected';
+export type ChatWidgetNavigationTarget = {
+  id: string;
+  roomId: string;
+  messageId?: string;
+};
+
+export type RealtimeStatus = 'disabled' | 'connecting' | 'disconnected' | 'connected';
+
+export type ChatRealtimeDiagnosticKind =
+  | 'connect_start'
+  | 'connected'
+  | 'disconnected'
+  | 'cleanup'
+  | 'event_received'
+  | 'duplicate_event'
+  | 'parse_error'
+  | 'reconnect_requested'
+  | 'polling_refresh';
+
+export type ChatRealtimeDiagnostic = {
+  kind: ChatRealtimeDiagnosticKind;
+  status: RealtimeStatus;
+  timestamp: string;
+  eventName?: string;
+  selectedRoomId?: string | null;
+};
+
+export type PresenceStatus = 'online' | 'offline';
+
+export type PresenceState = {
+  status: PresenceStatus;
+  lastSeenAt: string;
+};
 
 export type TaskRoomLookupResult = {
   roomId: string;
@@ -89,10 +128,14 @@ export type ChatWidgetCallbacks = {
   onUnreadCountChange?: (count: number) => void;
   onRoomChange?: (roomId: string | null) => void;
   onMessageSent?: (message: Message) => void;
+  onTaskOpen?: (taskId: string) => void;
+  onTaskReferenceCopy?: (taskReference: string) => void;
   onNotificationClick?: (notification: Notification) => void;
+  onNotificationReceived?: (notification: Notification) => void;
   onAuthError?: (error: Error) => void;
   onAccessDenied?: (error: Error) => void;
   onRealtimeStatusChange?: (status: RealtimeStatus) => void;
+  onRealtimeDiagnostic?: (diagnostic: ChatRealtimeDiagnostic) => void;
   onClose?: () => void;
 };
 
@@ -110,6 +153,7 @@ export type ChatWidgetProps = {
   auth?: ChatWidgetAuth;
   context?: ChatWidgetContext;
   initialRoomId?: string;
+  navigationTarget?: ChatWidgetNavigationTarget;
   mode?: ChatWidgetMode;
   enableRealtime?: boolean;
   className?: string;

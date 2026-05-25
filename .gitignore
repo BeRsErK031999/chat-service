@@ -3,6 +3,11 @@ dist/
 .env
 .env.local
 coverage/
+logs/
+tmp/
+.vite/
+.eslintcache
+*.tsbuildinfo
 .yarn/install-state.gz
 *.log
 Data for connecting to the server.txt

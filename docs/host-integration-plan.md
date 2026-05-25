@@ -62,12 +62,16 @@ the token. Keep TTL short and treat logs as sensitive.
 
 ## Desktop Status
 
-`time-tracker-desktop` now generates a chat bearer token when `VITE_CHAT_INTERNAL_AUTH_SECRET` is configured and passes
-`auth.strategy: "bearer"` to `ChatWidget`. If the secret is absent, the existing dev-user-id path remains for local
-workflow only.
+`time-tracker-desktop` now generates chat bearer tokens in Electron main when main-process
+`CHAT_INTERNAL_AUTH_SECRET` is configured. Renderer code calls `window.electronAPI.getChatAuthToken()` without identity
+payload, receives only a short-lived token plus the trusted signed user, and passes `auth.strategy: "bearer"` to
+`ChatWidget`.
+
+The renderer must not receive `CHAT_INTERNAL_AUTH_SECRET`, `VITE_CHAT_INTERNAL_AUTH_SECRET`, or renderer-controlled
+bearer identity env. If the main-process secret is absent, the existing dev-user-id path remains for local workflow only
+and must not be used as a production-style success path.
 
 ## Next Phase
 
-- Move token signing out of renderer-visible env for packaged production.
-- Define stable host-user to chat-user mapping instead of env overrides.
+- Define stable host-user to chat-user mapping beyond staging overrides.
 - Add operational guidance for secret rotation and proxy log redaction.

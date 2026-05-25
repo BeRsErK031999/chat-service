@@ -3,6 +3,11 @@ dist/*
 !dist/frontend
 !dist/frontend/**
 coverage
+logs
+tmp
+.vite
+.eslintcache
+*.tsbuildinfo
 .git
 .env
 .env.local

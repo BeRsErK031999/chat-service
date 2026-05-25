@@ -16,7 +16,8 @@ export type ChatApiClient = {
   getRooms: () => Promise<RoomListItem[]>;
   lookupTaskRoom: (taskId: string, roomScope: ChatWidgetRoomScope) => Promise<TaskRoomLookupResult>;
   getMessages: (roomId: string) => Promise<Message[]>;
-  sendMessage: (roomId: string, body: string) => Promise<Message>;
+  createMessageIdempotencyKey: () => string;
+  sendMessage: (roomId: string, body: string, idempotencyKey?: string) => Promise<Message>;
   markRoomRead: (roomId: string, lastReadSequence: number) => Promise<unknown>;
   getNotifications: () => Promise<Notification[]>;
   markNotificationRead: (notificationId: string) => Promise<Notification>;
@@ -108,11 +109,13 @@ export const createChatApiClient = (config: ChatApiClientConfig): ChatApiClient 
 
   getMessages: (roomId) => request<Message[]>(config, `/rooms/${roomId}/messages?limit=50`),
 
-  sendMessage: (roomId, body) =>
+  createMessageIdempotencyKey: createIdempotencyKey,
+
+  sendMessage: (roomId, body, idempotencyKey = createIdempotencyKey()) =>
     request<Message>(config, `/rooms/${roomId}/messages`, {
       method: 'POST',
       headers: {
-        'Idempotency-Key': createIdempotencyKey(),
+        'Idempotency-Key': idempotencyKey,
       },
       body: JSON.stringify({
         body,

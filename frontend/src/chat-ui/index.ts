@@ -6,6 +6,7 @@ export type {
   ChatWidgetContext,
   ChatWidgetLabels,
   ChatWidgetMode,
+  ChatWidgetNavigationTarget,
   ChatWidgetProps,
   ChatWidgetRoomScope,
   ChatWidgetUser,

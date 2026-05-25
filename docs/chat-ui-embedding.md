@@ -41,10 +41,11 @@ If `auth` is omitted, the widget uses `currentUser.id` as dev auth. Production h
 | `auth` | no | Auth strategy. Defaults to dev `x-user-id` based on `currentUser.id`. |
 | `context` | no | Host context for room/task embedding. Supports `taskId`, `roomId`, `roomScope`, and `source`. |
 | `initialRoomId` | no | Backward-compatible room id to select on load. `context.roomId` takes precedence. |
+| `navigationTarget` | no | Platform-neutral room/message target for notification routing. New `id` values select `roomId`; `messageId` is highlighted when it is in the loaded message window. |
 | `mode` | no | `"full"`, `"embedded"`, or `"compact"`. Defaults to `"full"`. Compact hides notifications. |
 | `enableRealtime` | no | Enables SSE realtime when `true`. Defaults to `true`; polling fallback still runs when disconnected. |
 | `className` | no | Optional class added to the widget shell for host-specific layout. |
-| `callbacks` | no | Host callbacks for unread count, room changes, message sent, auth/access errors, realtime status, close, and notifications. |
+| `callbacks` | no | Host callbacks for unread count, room changes, message sent, task actions, auth/access errors, realtime status, close, and notifications. |
 | `labels` | no | Host text overrides for title and empty states. |
 
 ## Types
@@ -77,10 +78,14 @@ type ChatWidgetCallbacks = {
   onUnreadCountChange?: (count: number) => void;
   onRoomChange?: (roomId: string | null) => void;
   onMessageSent?: (message: Message) => void;
+  onTaskOpen?: (taskId: string) => void;
+  onTaskReferenceCopy?: (taskReference: string) => void;
   onNotificationClick?: (notification: Notification) => void;
+  onNotificationReceived?: (notification: Notification) => void;
   onAuthError?: (error: Error) => void;
   onAccessDenied?: (error: Error) => void;
   onRealtimeStatusChange?: (status: RealtimeStatus) => void;
+  onRealtimeDiagnostic?: (diagnostic: ChatRealtimeDiagnostic) => void;
   onClose?: () => void;
 };
 ```
@@ -92,6 +97,10 @@ type ChatWidgetCallbacks = {
 
 `onRoomChange` fires when the selected room id changes. `onClose` only adds a close button when the host provides the
 callback, so the playground does not show close controls.
+
+`onTaskOpen` and `onTaskReferenceCopy` are platform-neutral workflow action hooks. The reusable widget only emits the
+task id or task reference; desktop shells, browser shells, and future hosts decide how to open tasks or write to a
+host-safe clipboard. If `onTaskReferenceCopy` is not provided, the browser widget attempts `navigator.clipboard`.
 
 ## Desktop Example
 
@@ -115,6 +124,8 @@ callback, so the playground does not show close controls.
   callbacks={{
     onUnreadCountChange: (count) => shellBadges.setChatUnread(count),
     onRoomChange: (roomId) => shellState.setChatRoomId(roomId),
+    onTaskOpen: (taskId) => shellTasks.open(taskId),
+    onTaskReferenceCopy: (taskReference) => shellClipboard.writeText(taskReference),
     onAccessDenied: (error) => shellToasts.error(error.message),
     onRealtimeStatusChange: (status) => shellTelemetry.chatRealtime(status),
     onClose: () => shellPanels.close('chat'),
@@ -144,6 +155,8 @@ callback, so the playground does not show close controls.
   callbacks={{
     onUnreadCountChange: setChatUnreadCount,
     onMessageSent: (message) => analytics.track('chat_message_sent', { roomId: message.roomId }),
+    onTaskOpen: (taskId) => openTask(taskId),
+    onTaskReferenceCopy: (taskReference) => copyToClipboard(taskReference),
     onNotificationClick: (notification) => openTaskFromNotification(notification),
     onAuthError: () => redirectToLogin(),
     onAccessDenied: (error) => showToast(error.message),
@@ -173,8 +186,8 @@ HTTP requests send:
 Authorization: Bearer <chat-internal-token>
 ```
 
-The token is an HS256 JWT-style token with `userId`, `displayName`, `issuedAt`, `expiresAt`, and `source` (`desktop` or
-`web`). `expiresAt` is required and expired tokens are rejected with `401`.
+The token is an HS256 JWT-style token with `userId`, `displayName`, `issuedAt`, `expiresAt`, and `source` (`desktop`,
+`web`, or `playground`). `expiresAt` is required and expired tokens are rejected with `401`.
 
 For SSE, browser `EventSource` cannot set custom headers. The widget therefore appends the same short-lived token:
 
@@ -190,6 +203,11 @@ Dev compatibility remains available only when the backend has `CHAT_ALLOW_DEV_US
 - SSE `/events?userId=<uuid>`
 
 Set `CHAT_ALLOW_DEV_USER_ID=false` in production.
+
+Staging bearer smoke on 2026-05-21 used `CHAT_ALLOW_DEV_USER_ID=false`: `x-user-id` HTTP auth and
+`/events?userId=<uuid>` both returned `401`, while bearer HTTP and bearer SSE via `accessToken` worked. The desktop
+renderer did not receive `CHAT_INTERNAL_AUTH_SECRET`; Electron main signed the short-lived token. Browser playgrounds
+that still depend on dev-user-id need bearer support before they can act as a production-style smoke client.
 
 ## Room Context
 
@@ -222,6 +240,62 @@ Minimal task-context embed:
 />;
 ```
 
+## Task-Centric UX
+
+The first task-centric UX layer is implemented inside the reusable `frontend/src/chat-ui` source of truth without new
+backend contract requirements.
+
+Audit summary:
+
+- `ChatWidget` owns rooms state from `GET /rooms`, messages state from `GET /rooms/:roomId/messages`, notifications
+  state from `GET /notifications`, draft/send state, selected room state, and optimistic local message state.
+- `useChatRealtime` owns the SSE lifecycle and emits refresh callbacks for `message.created`, `notification.created`,
+  `notification.read`, `room.read`, and `presence.changed`.
+- Optimistic send/retry stays in `ChatWidget`: failed local messages keep the original `Idempotency-Key` and retry
+  through the same API client path.
+- `/rooms` already provides `type`, `taskId`, `projectId`, `taskRoomKind`, `lastMessage`, and `unreadCount`.
+- `/task-rooms/lookup` already provides `roomId`, `taskId`, `roomScope`, and `roomName` for host task context.
+- The minimal UX extension points are the room list, room header, message metadata, and presence event state; no route,
+  auth, or transport changes are needed.
+
+Current task-centric UI behavior:
+
+- Task rooms are grouped above ordinary recent conversations.
+- Rooms are ordered unread-first and then by recent activity inside each group.
+- The room list includes a local search/filter box covering room name, type, scope, task id, project id, and latest
+  message preview.
+- Keyboard workflow supports `Ctrl`/`Cmd+K` or `/` to focus room search, `ArrowUp`/`ArrowDown` to switch visible rooms,
+  `Enter` to open the first match, and `Escape` to clear or leave search.
+- Selecting a room focuses the composer so daily task discussion flow is search, open, type.
+- Command-like workflow actions are available in the room header: jump to task, copy task reference, open a related
+  discussion, mark read, mark unread, reopen a recent task room, jump to next unread, and return to the previous
+  discussion.
+- Keyboard traversal also supports `Alt+ArrowUp`/`Alt+ArrowDown` for previous/next room,
+  `Alt+Shift+ArrowUp`/`Alt+Shift+ArrowDown` for previous/next unread room, `Ctrl`/`Cmd+Shift+A` for active discussion
+  cycling, and `Ctrl`/`Cmd+Shift+L` to return to the previous discussion.
+- Hosts can route notification clicks by passing `navigationTarget`; room selection is guaranteed, while message
+  highlight is best-effort for messages present in the currently loaded message window.
+- Hosts can preserve task/discussion context after shell reopen by passing the last observed `onRoomChange` value back
+  as `initialRoomId`. `context.roomId` still takes precedence for explicit routing.
+- Task rooms get a task discussion label and stronger unread badge styling.
+- Room rows show existing room type/scope metadata when available.
+- Room rows now surface lightweight workflow awareness from existing room data: unread rooms are marked as needing
+  attention, caught-up rooms show relative recent activity, and task discussions keep the stronger unread treatment.
+- The active room header shows task discussion, scope, task reference, and host source chips when those values are
+  already known.
+- The active room header also shows caught-up/unread state, last activity, and known active participants inferred from
+  visible messages plus existing `presence.changed` state.
+- Notifications are ordered unread-first and recent-first, with priority/read labels for quicker attention scanning.
+- Direct, group, system, internal, manager, customer, and system-events differences are rendered as lightweight labels
+  rather than a new room model.
+
+Current presence UI behavior:
+
+- Presence remains SSE-only through existing `presence.changed` events.
+- The widget stores lightweight presence state in memory by user id.
+- Message metadata renders an online/offline dot and formatted last-seen tooltip when presence is known.
+- The current user indicator follows the active realtime connection state.
+
 ## Layer Ownership
 
 The reusable layer owns:
@@ -229,18 +303,29 @@ The reusable layer owns:
 - `ChatWidget`
 - host-facing public types
 - API client creation from `apiBaseUrl` and `auth`
-- SSE realtime hook with connected/disconnected state callback
-- polling fallback refresh trigger
+- SSE realtime hook with connecting/connected/disconnected state callback
+- stable `EventSource` lifecycle across room switching through refs for selected room and refresh handlers
+- sanitized realtime diagnostics callback for opt-in smoke logging without tokens, URLs, headers, names, or bodies
+- polling fallback refresh trigger, browser online recovery, and bfcache `pageshow` recovery
+- duplicate realtime event protection for message, notification, and room-read refreshes
 - room list, message list, composer, notifications panel, and realtime status components
+- optimistic message send state with retry using the original `Idempotency-Key`
+- lightweight presence events over the existing SSE connection
+- task-centric room grouping, scope labels, contextual room header metadata, and presence indicators
+- workflow awareness cues derived from existing rooms, notifications, visible messages, and SSE presence state
+- command-like navigation/action behavior, including unread traversal, active discussion cycling, previous discussion
+  return, recent task room recall, local mark-unread emphasis, and platform-neutral task action callbacks
 
 The playground layer owns:
 
 - Artem and Tester dev user ids
-- the dev user switcher
+- the auth switcher for dev-user-id and manually pasted bearer tokens
 - the `/chat/` internal testing wrapper
 - default playground API base URL from `VITE_API_BASE_URL ?? '/chat/api'`
 
 Dev users must not be imported into `frontend/src/chat-ui`.
+Bearer mode is the production-style smoke path for staging with `CHAT_ALLOW_DEV_USER_ID=false`; the browser never signs
+tokens and never receives `CHAT_INTERNAL_AUTH_SECRET`.
 
 ## Current Limits
 
@@ -249,4 +334,28 @@ Dev users must not be imported into `frontend/src/chat-ui`.
 - Task room lookup only checks current room membership; organization/project ACLs are not implemented in this step.
 - The chat UI is still styled by the app-level `frontend/src/styles.css`.
 - SSE remains the realtime transport; WebSocket is intentionally not added.
-- No desktop shell or web gantt integration exists yet.
+- Presence uses in-process SSE connection state plus `User.lastSeenAt`; it is not a durable global fanout layer.
+- Mark unread is a local attention-management affordance in the widget; the current backend API only persists mark read.
+- Message highlighting through `navigationTarget.messageId` is best-effort for messages present in the loaded message
+  window.
+- Browser automation smoke may be unavailable in some local Codex sessions; do not record browser playground success
+  unless the browser tooling actually ran.
+
+## Staging Presence/Reconnection Smoke on 2026-05-22
+
+Staging was redeployed from commit `1ea2df0046453a058b8ec173e3548d6fe5c55387` and `/chat/api/health` returned
+`{"status":"ok"}`. Production-style auth stayed intact: `x-user-id` `/rooms` and `/events?userId=<uuid>` returned
+`401`, while short-lived bearer tokens loaded `/rooms` and connected to `/events?accessToken=<token>`.
+
+The live API/SSE smoke passed:
+
+- `presence.changed` online was emitted when Artem opened an SSE stream and was seen by Tester.
+- Two concurrent Artem SSE streams did not emit a false offline when only one stream closed.
+- Closing the remaining Artem stream emitted offline and updated `User.lastSeenAt`.
+- Desktop-source Artem and playground-source Tester bearer clients exchanged messages through `Direct Chat`.
+- `message.created`, `notification.created`, and `room.read` arrived over SSE.
+- Reusing the same `Idempotency-Key` for a retry returned the same message id and left only one message copy.
+- Restarting the staging app container closed the old SSE stream, `/health` recovered, `/rooms` stayed available, and a
+  new bearer SSE stream connected.
+
+No WebSocket, NATS, Redis presence, Kubernetes, or durable fanout layer was needed for this phase.

@@ -14,7 +14,9 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -78,6 +80,72 @@ button:disabled {
   color: #637083;
 }
 
+.auth-mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.auth-mode-tabs button {
+  min-height: 38px;
+  border-radius: 6px;
+}
+
+.auth-mode-tabs button.active {
+  border-color: #2f7d6d;
+  background: #e8f4f1;
+}
+
+.bearer-auth-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.bearer-auth-form label {
+  display: grid;
+  gap: 6px;
+  color: #637083;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bearer-auth-form select,
+.bearer-auth-form textarea {
+  width: 100%;
+  border: 1px solid #b9c5cf;
+  border-radius: 6px;
+  color: #1c2430;
+  background: #ffffff;
+}
+
+.bearer-auth-form select {
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.bearer-auth-form textarea {
+  min-height: 112px;
+  resize: vertical;
+  padding: 10px;
+  font-family:
+    "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+}
+
+.bearer-auth-form > button {
+  min-height: 40px;
+  border-radius: 6px;
+}
+
+.auth-hint {
+  margin: 0;
+  color: #637083;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 300px minmax(420px, 1fr) 340px;
@@ -108,6 +176,26 @@ button:disabled {
   min-height: 34px;
   padding: 0 12px;
   border-radius: 6px;
+}
+
+.playground-switcher-warning {
+  color: #9a3412;
+  font-size: 12px;
+}
+
+.playground-auth-notice {
+  position: fixed;
+  z-index: 3;
+  top: 16px;
+  left: 50%;
+  max-width: min(720px, calc(100vw - 32px));
+  padding: 10px 12px;
+  transform: translateX(-50%);
+  border: 1px solid #ce5a46;
+  border-radius: 8px;
+  background: #fff1ee;
+  color: #7c281a;
+  box-shadow: 0 10px 30px rgb(28 36 48 / 12%);
 }
 
 .chat-widget-embedded,
