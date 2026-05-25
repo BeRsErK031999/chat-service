@@ -267,6 +267,12 @@
   background: #fff1ee;
 }
 
+.chat-ui-message-highlighted {
+  border-color: #d6a43f;
+  background: #fff8e9;
+  box-shadow: 0 0 0 3px rgba(214, 164, 63, 0.24);
+}
+
 .chat-ui-message p,
 .chat-ui-notification p {
   margin: 6px 0 0;

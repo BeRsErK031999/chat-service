@@ -41,6 +41,7 @@ If `auth` is omitted, the widget uses `currentUser.id` as dev auth. Production h
 | `auth` | no | Auth strategy. Defaults to dev `x-user-id` based on `currentUser.id`. |
 | `context` | no | Host context for room/task embedding. Supports `taskId`, `roomId`, `roomScope`, and `source`. |
 | `initialRoomId` | no | Backward-compatible room id to select on load. `context.roomId` takes precedence. |
+| `navigationTarget` | no | Platform-neutral room/message target for notification routing. New `id` values select `roomId`; `messageId` is highlighted when it is in the loaded message window. |
 | `mode` | no | `"full"`, `"embedded"`, or `"compact"`. Defaults to `"full"`. Compact hides notifications. |
 | `enableRealtime` | no | Enables SSE realtime when `true`. Defaults to `true`; polling fallback still runs when disconnected. |
 | `className` | no | Optional class added to the widget shell for host-specific layout. |
@@ -78,6 +79,7 @@ type ChatWidgetCallbacks = {
   onRoomChange?: (roomId: string | null) => void;
   onMessageSent?: (message: Message) => void;
   onNotificationClick?: (notification: Notification) => void;
+  onNotificationReceived?: (notification: Notification) => void;
   onAuthError?: (error: Error) => void;
   onAccessDenied?: (error: Error) => void;
   onRealtimeStatusChange?: (status: RealtimeStatus) => void;
@@ -254,6 +256,8 @@ Current task-centric UI behavior:
 - Keyboard workflow supports `Ctrl`/`Cmd+K` or `/` to focus room search, `ArrowUp`/`ArrowDown` to switch visible rooms,
   `Enter` to open the first match, and `Escape` to clear or leave search.
 - Selecting a room focuses the composer so daily task discussion flow is search, open, type.
+- Hosts can route notification clicks by passing `navigationTarget`; room selection is guaranteed, while message
+  highlight is best-effort for messages present in the currently loaded message window.
 - Task rooms get a task discussion label and stronger unread badge styling.
 - Room rows show existing room type/scope metadata when available.
 - The active room header shows task discussion, scope, task reference, and host source chips when those values are

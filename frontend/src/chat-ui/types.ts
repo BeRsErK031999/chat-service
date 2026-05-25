@@ -83,6 +83,12 @@ export type Notification = {
   updatedAt: string;
 };
 
+export type ChatWidgetNavigationTarget = {
+  id: string;
+  roomId: string;
+  messageId?: string;
+};
+
 export type RealtimeStatus = 'disabled' | 'connecting' | 'disconnected' | 'connected';
 
 export type PresenceStatus = 'online' | 'offline';
@@ -104,6 +110,7 @@ export type ChatWidgetCallbacks = {
   onRoomChange?: (roomId: string | null) => void;
   onMessageSent?: (message: Message) => void;
   onNotificationClick?: (notification: Notification) => void;
+  onNotificationReceived?: (notification: Notification) => void;
   onAuthError?: (error: Error) => void;
   onAccessDenied?: (error: Error) => void;
   onRealtimeStatusChange?: (status: RealtimeStatus) => void;
@@ -124,6 +131,7 @@ export type ChatWidgetProps = {
   auth?: ChatWidgetAuth;
   context?: ChatWidgetContext;
   initialRoomId?: string;
+  navigationTarget?: ChatWidgetNavigationTarget;
   mode?: ChatWidgetMode;
   enableRealtime?: boolean;
   className?: string;

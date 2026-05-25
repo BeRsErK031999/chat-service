@@ -37,6 +37,7 @@ export const ChatWidget = ({
   auth,
   context,
   initialRoomId,
+  navigationTarget,
   mode = 'full',
   enableRealtime = true,
   className,
@@ -83,6 +84,9 @@ export const ChatWidget = ({
   const lastUnreadCountRef = useRef<number | null>(null);
   const lastRoomChangeRef = useRef<string | null | undefined>(undefined);
   const deniedRoomIdRef = useRef<string | null>(null);
+  const lastNavigationTargetIdRef = useRef<string | null>(null);
+  const notificationIdsRef = useRef<Set<string>>(new Set());
+  const hasLoadedNotificationsRef = useRef(false);
   const roomSearchInputRef = useRef<HTMLInputElement | null>(null);
   const composerInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -243,6 +247,16 @@ export const ChatWidget = ({
     setIsLoadingNotifications(true);
     try {
       const nextNotifications = await client.getNotifications();
+      if (hasLoadedNotificationsRef.current) {
+        for (const notification of nextNotifications) {
+          if (notification.readAt === null && !notificationIdsRef.current.has(notification.id)) {
+            callbacks?.onNotificationReceived?.(notification);
+          }
+        }
+      }
+
+      notificationIdsRef.current = new Set(nextNotifications.map((notification) => notification.id));
+      hasLoadedNotificationsRef.current = true;
       setNotifications(nextNotifications);
       setError(null);
     } catch (caughtError) {
@@ -250,7 +264,7 @@ export const ChatWidget = ({
     } finally {
       setIsLoadingNotifications(false);
     }
-  }, [client, reportError]);
+  }, [callbacks, client, reportError]);
 
   const refreshAll = useCallback(async () => {
     await Promise.all([loadRooms(), loadMessages(), loadNotifications()]);
@@ -332,6 +346,19 @@ export const ChatWidget = ({
 
     composerInputRef.current?.focus();
   }, [selectedRoomId]);
+
+  useEffect(() => {
+    if (
+      navigationTarget === undefined ||
+      lastNavigationTargetIdRef.current === navigationTarget.id
+    ) {
+      return;
+    }
+
+    lastNavigationTargetIdRef.current = navigationTarget.id;
+    setRoomSearchQuery('');
+    setSelectedRoomId(navigationTarget.roomId);
+  }, [navigationTarget]);
 
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent): void => {
@@ -569,6 +596,10 @@ export const ChatWidget = ({
           selectedRoom={selectedRoom}
           currentUserId={currentUser.id}
           presenceByUserId={presenceByUserId}
+          {...(selectedRoomId === navigationTarget?.roomId &&
+          navigationTarget.messageId !== undefined
+            ? { highlightedMessageId: navigationTarget.messageId }
+            : {})}
           isLoading={isLoadingMessages}
           onRetryMessage={(messageId) => void handleRetryMessage(messageId)}
           messagesEmptyLabel={labels?.messagesEmpty}
