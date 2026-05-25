@@ -3,7 +3,15 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'scripts/clean.mjs', 'eslint.config.js', 'prettier.config.cjs'],
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'scripts/clean.mjs',
+      'scripts/check-chat-env.cjs',
+      'scripts/print-chat-smoke-checklist.cjs',
+      'eslint.config.js',
+      'prettier.config.cjs',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,

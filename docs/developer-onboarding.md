@@ -189,9 +189,20 @@ yarn type-check
 yarn lint
 yarn test
 yarn build
+yarn check:chat-env
+yarn chat:smoke-checklist
 git diff --check
 git status --short --branch
 ```
+
+`yarn check:chat-env` is a local guardrail helper. It reports whether the required server env keys are validated or
+documented, whether `CHAT_INTERNAL_AUTH_SECRET` is accidentally exposed with a `VITE_` prefix, whether dev-user-id mode
+is enabled in the current shell, whether explicit CORS origins are configured, and whether PNA support is documented.
+It prints only safe statuses and never prints secret values. It does not contact staging or prove that real secrets are
+correct.
+
+`yarn chat:smoke-checklist` prints the manual pre-deploy, API/SSE, desktop visual smoke, security grep, and limitation
+checklist. It does not execute requests, open Electron, deploy, or require credentials.
 
 When desktop docs or runtime files changed:
 

@@ -65,6 +65,16 @@ yarn test
 yarn build
 ```
 
+Operational helper scripts:
+
+```bash
+yarn check:chat-env
+yarn chat:smoke-checklist
+```
+
+`check:chat-env` prints safe readiness statuses for chat server environment guardrails. It does not print secret values
+or call staging. `chat:smoke-checklist` prints the manual deploy/smoke checklist and does not require secrets.
+
 Development server:
 
 ```bash

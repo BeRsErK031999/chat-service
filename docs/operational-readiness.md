@@ -26,20 +26,31 @@ Use this gate before promoting `develop` to `main` or before treating a staging 
    yarn lint
    yarn test
    yarn build
+   yarn check:chat-env
+   yarn chat:smoke-checklist
    git diff --check
    ```
 
-3. Inspect the release diff:
+3. Read the helper output:
+
+   - `yarn check:chat-env` checks env schema/documentation guardrails, `CHAT_INTERNAL_AUTH_SECRET` prefix safety,
+     explicit CORS origin presence, dev-user-id mode, and Private Network Access documentation/code presence.
+   - `yarn chat:smoke-checklist` prints the pre-deploy, post-deploy API/SSE, native desktop, security grep, and known
+     limitation checklist.
+   - Neither helper prints secret values, makes network requests, deploys, opens Electron, or proves that staging is
+     reachable.
+
+4. Inspect the release diff:
 
    ```powershell
    git diff origin/develop...HEAD
    git diff --stat origin/develop...HEAD
    ```
 
-4. Confirm the diff has no secrets, bearer tokens, access tokens, real `.env` values, debug logging, temporary comments,
+5. Confirm the diff has no secrets, bearer tokens, access tokens, real `.env` values, debug logging, temporary comments,
    wildcard CORS, renderer auth fallback, or unrelated file changes.
 
-5. Confirm the release does not introduce unplanned architecture:
+6. Confirm the release does not introduce unplanned architecture:
 
    - no WebSocket migration;
    - no NATS, Redis, or queue dependency;
@@ -174,6 +185,7 @@ Fast application rollback:
    yarn lint
    yarn test
    yarn build
+   yarn check:chat-env
    git diff --check
    ```
 
