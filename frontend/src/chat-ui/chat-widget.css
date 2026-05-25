@@ -94,6 +94,7 @@
 
 .chat-ui-sidebar-header button,
 .chat-ui-chat-header button,
+.chat-ui-action-bar button,
 .chat-ui-toolbar button,
 .chat-ui-composer button,
 .chat-ui-notification button {
@@ -113,6 +114,18 @@
 
 .chat-ui-chat-header h2 {
   margin: 4px 0 0;
+}
+
+.chat-ui-action-bar {
+  display: flex;
+  max-width: 420px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.chat-ui-action-bar button {
+  white-space: nowrap;
 }
 
 .chat-ui-room-context {

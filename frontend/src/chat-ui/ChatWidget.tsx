@@ -32,6 +32,21 @@ import type {
 const toError = (caughtError: unknown, fallback: string): Error =>
   caughtError instanceof Error ? caughtError : new Error(fallback);
 
+const getRoomActivityTime = (room: RoomListItem): number => {
+  if (room.lastMessageAt === null) {
+    return 0;
+  }
+
+  const timestamp = new Date(room.lastMessageAt).getTime();
+
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+};
+
+const sortRoomsByActivity = (rooms: RoomListItem[]): RoomListItem[] =>
+  [...rooms].sort((left, right) => getRoomActivityTime(right) - getRoomActivityTime(left));
+
+const getRecentActivityBoundary = (): number => Date.now() - 30 * 60_000;
+
 export const ChatWidget = ({
   apiBaseUrl,
   currentUser,
@@ -88,6 +103,8 @@ export const ChatWidget = ({
   const lastNavigationTargetIdRef = useRef<string | null>(null);
   const notificationIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedNotificationsRef = useRef(false);
+  const lastActiveRoomIdRef = useRef<string | null>(null);
+  const recentTaskRoomIdsRef = useRef<string[]>([]);
   const roomSearchInputRef = useRef<HTMLInputElement | null>(null);
   const composerInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -126,6 +143,29 @@ export const ChatWidget = ({
     [selectedRoom],
   );
 
+  const unreadRooms = useMemo(
+    () => sortRoomsByActivity(rooms.filter((room) => room.unreadCount > 0)),
+    [rooms],
+  );
+
+  const activeDiscussionRooms = useMemo(() => {
+    const recentActivityBoundary = getRecentActivityBoundary();
+
+    return sortRoomsByActivity(
+      rooms.filter((room) => {
+        if (room.unreadCount > 0) {
+          return true;
+        }
+
+        if (room.lastMessageAt === null) {
+          return false;
+        }
+
+        return getRoomActivityTime(room) >= recentActivityBoundary;
+      }),
+    );
+  }, [rooms]);
+
   const visibleMessages = useMemo<ChatMessage[]>(
     () =>
       [...messages, ...pendingMessages]
@@ -150,6 +190,86 @@ export const ChatWidget = ({
 
     return activeParticipantIds.size;
   }, [currentUser.id, presenceByUserId, visibleMessages]);
+
+  const selectRoom = useCallback(
+    (roomId: string | null, options: { preserveLastActive?: boolean } = {}): void => {
+      setSelectedRoomId((currentRoomId) => {
+        if (
+          options.preserveLastActive !== true &&
+          currentRoomId !== null &&
+          currentRoomId !== roomId
+        ) {
+          lastActiveRoomIdRef.current = currentRoomId;
+        }
+
+        return roomId;
+      });
+    },
+    [],
+  );
+
+  const selectRelativeRoom = useCallback(
+    (candidates: readonly RoomListItem[], direction: 1 | -1): void => {
+      if (candidates.length === 0) {
+        return;
+      }
+
+      const selectedIndex = candidates.findIndex((room) => room.id === selectedRoomId);
+      const fallbackIndex = direction === 1 ? 0 : candidates.length - 1;
+      const nextIndex =
+        selectedIndex === -1
+          ? fallbackIndex
+          : (selectedIndex + direction + candidates.length) % candidates.length;
+
+      const nextRoom = candidates[nextIndex];
+
+      if (nextRoom !== undefined) {
+        selectRoom(nextRoom.id);
+      }
+    },
+    [selectRoom, selectedRoomId],
+  );
+
+  const selectRecentTaskRoom = useCallback((): void => {
+    const recentRoom = recentTaskRoomIdsRef.current
+      .map((roomId) => rooms.find((room) => room.id === roomId) ?? null)
+      .find((room): room is RoomListItem => room !== null);
+
+    if (recentRoom !== undefined) {
+      selectRoom(recentRoom.id);
+      return;
+    }
+
+    const latestTaskRoom = sortRoomsByActivity(rooms.filter(isTaskRoom))[0];
+
+    if (latestTaskRoom !== undefined) {
+      selectRoom(latestTaskRoom.id);
+    }
+  }, [rooms, selectRoom]);
+
+  const openRelatedDiscussion = useCallback((): void => {
+    const relatedTaskId = selectedRoom?.taskId ?? context?.taskId ?? null;
+
+    if (relatedTaskId === null) {
+      selectRecentTaskRoom();
+      return;
+    }
+
+    const relatedRoom = sortRoomsByActivity(
+      rooms.filter((room) => room.id !== selectedRoomId && room.taskId === relatedTaskId),
+    )[0];
+
+    if (relatedRoom !== undefined) {
+      selectRoom(relatedRoom.id);
+      return;
+    }
+
+    const currentTaskRoom = rooms.find((room) => room.taskId === relatedTaskId);
+
+    if (currentTaskRoom !== undefined) {
+      selectRoom(currentTaskRoom.id);
+    }
+  }, [context?.taskId, rooms, selectRecentTaskRoom, selectRoom, selectedRoom, selectedRoomId]);
 
   useEffect(() => {
     if (taskRoomLookupContext === null) {
@@ -179,7 +299,7 @@ export const ChatWidget = ({
         }
 
         setLookupRoomId(null);
-        setSelectedRoomId(null);
+        selectRoom(null);
         setError(reportError(caughtError, 'Task room is not available for this user.', true));
       }
     };
@@ -189,7 +309,7 @@ export const ChatWidget = ({
     return () => {
       isActive = false;
     };
-  }, [client, reportError, taskRoomLookupContext]);
+  }, [client, reportError, selectRoom, taskRoomLookupContext]);
 
   const loadRooms = useCallback(async () => {
     setIsLoadingRooms(true);
@@ -205,18 +325,18 @@ export const ChatWidget = ({
           setError(accessError.message);
         }
 
-        setSelectedRoomId(null);
+        selectRoom(null);
         return;
       }
 
       if (requestedRoomId !== null) {
         deniedRoomIdRef.current = null;
-        setSelectedRoomId(requestedRoomId);
+        selectRoom(requestedRoomId, { preserveLastActive: true });
         return;
       }
 
       if (taskRoomLookupContext !== null) {
-        setSelectedRoomId(null);
+        selectRoom(null);
         return;
       }
 
@@ -232,7 +352,7 @@ export const ChatWidget = ({
     } finally {
       setIsLoadingRooms(false);
     }
-  }, [callbacks, client, reportError, requestedRoomId, taskRoomLookupContext]);
+  }, [callbacks, client, reportError, requestedRoomId, selectRoom, taskRoomLookupContext]);
 
   const loadMessages = useCallback(async () => {
     if (selectedRoomId === null) {
@@ -356,6 +476,17 @@ export const ChatWidget = ({
   }, [callbacks, selectedRoomId]);
 
   useEffect(() => {
+    if (selectedRoom === null || !isTaskRoom(selectedRoom)) {
+      return;
+    }
+
+    recentTaskRoomIdsRef.current = [
+      selectedRoom.id,
+      ...recentTaskRoomIdsRef.current.filter((roomId) => roomId !== selectedRoom.id),
+    ].slice(0, 5);
+  }, [selectedRoom]);
+
+  useEffect(() => {
     if (selectedRoomId === null) {
       return;
     }
@@ -373,8 +504,8 @@ export const ChatWidget = ({
 
     lastNavigationTargetIdRef.current = navigationTarget.id;
     setRoomSearchQuery('');
-    setSelectedRoomId(navigationTarget.roomId);
-  }, [navigationTarget]);
+    selectRoom(navigationTarget.roomId);
+  }, [navigationTarget, selectRoom]);
 
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent): void => {
@@ -405,6 +536,44 @@ export const ChatWidget = ({
         return;
       }
 
+      if (event.altKey && event.shiftKey && event.key === 'ArrowDown') {
+        event.preventDefault();
+        selectRelativeRoom(unreadRooms, 1);
+        return;
+      }
+
+      if (event.altKey && event.shiftKey && event.key === 'ArrowUp') {
+        event.preventDefault();
+        selectRelativeRoom(unreadRooms, -1);
+        return;
+      }
+
+      if (event.altKey && !event.shiftKey && event.key === 'ArrowDown') {
+        event.preventDefault();
+        selectRelativeRoom(rooms, 1);
+        return;
+      }
+
+      if (event.altKey && !event.shiftKey && event.key === 'ArrowUp') {
+        event.preventDefault();
+        selectRelativeRoom(rooms, -1);
+        return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'a') {
+        event.preventDefault();
+        selectRelativeRoom(activeDiscussionRooms, 1);
+        return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'l') {
+        event.preventDefault();
+        if (lastActiveRoomIdRef.current !== null) {
+          selectRoom(lastActiveRoomIdRef.current, { preserveLastActive: true });
+        }
+        return;
+      }
+
       if (event.key === '/') {
         event.preventDefault();
         roomSearchInputRef.current?.focus();
@@ -414,7 +583,7 @@ export const ChatWidget = ({
     window.addEventListener('keydown', handleKeyDown);
 
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [roomSearchQuery]);
+  }, [activeDiscussionRooms, roomSearchQuery, rooms, selectRelativeRoom, selectRoom, unreadRooms]);
 
   const sendDraft = async (body: string, idempotencyKey: string, localMessageId: string): Promise<void> => {
     if (selectedRoomId === null) {
@@ -516,6 +685,54 @@ export const ChatWidget = ({
     }
   };
 
+  const handleMarkRoomUnread = (): void => {
+    if (selectedRoomId === null) {
+      return;
+    }
+
+    setRooms((currentRooms) =>
+      currentRooms.map((room) =>
+        room.id === selectedRoomId
+          ? {
+              ...room,
+              unreadCount: Math.max(room.unreadCount, 1),
+            }
+          : room,
+      ),
+    );
+  };
+
+  const handleOpenTask = (): void => {
+    const taskId = selectedRoom?.taskId ?? context?.taskId;
+
+    if (taskId === undefined || taskId === null) {
+      return;
+    }
+
+    callbacks?.onTaskOpen?.(taskId);
+  };
+
+  const handleCopyTaskReference = async (): Promise<void> => {
+    if (selectedTaskReferenceLabel === null) {
+      return;
+    }
+
+    if (callbacks?.onTaskReferenceCopy !== undefined) {
+      callbacks.onTaskReferenceCopy(selectedTaskReferenceLabel);
+      return;
+    }
+
+    if (navigator.clipboard === undefined) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(selectedTaskReferenceLabel);
+    } catch (caughtError) {
+      setError(reportError(caughtError, 'Failed to copy task reference.'));
+    }
+  };
+
   const handleMarkNotificationRead = async (notificationId: string): Promise<void> => {
     try {
       await client.markNotificationRead(notificationId);
@@ -572,7 +789,7 @@ export const ChatWidget = ({
           emptyLabel={labels?.roomsEmpty}
           searchEmptyLabel="No rooms match this workflow."
           onSearchQueryChange={setRoomSearchQuery}
-          onSelectRoom={setSelectedRoomId}
+          onSelectRoom={selectRoom}
         />
       </aside>
 
@@ -613,13 +830,56 @@ export const ChatWidget = ({
               </div>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={() => void handleMarkRoomRead()}
-            disabled={selectedRoom === null || lastSequence === 0}
-          >
-            Mark as read
-          </button>
+          <div className="chat-ui-action-bar" aria-label="Workflow actions">
+            <button
+              type="button"
+              onClick={handleOpenTask}
+              disabled={(selectedRoom?.taskId ?? context?.taskId) === undefined}
+            >
+              Jump to task
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleCopyTaskReference()}
+              disabled={selectedTaskReferenceLabel === null}
+            >
+              Copy ref
+            </button>
+            <button type="button" onClick={openRelatedDiscussion} disabled={rooms.length === 0}>
+              Related
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleMarkRoomRead()}
+              disabled={selectedRoom === null || lastSequence === 0}
+            >
+              Mark read
+            </button>
+            <button type="button" onClick={handleMarkRoomUnread} disabled={selectedRoom === null}>
+              Mark unread
+            </button>
+            <button type="button" onClick={selectRecentTaskRoom} disabled={rooms.length === 0}>
+              Recent task
+            </button>
+            <button
+              type="button"
+              onClick={() => selectRelativeRoom(unreadRooms, 1)}
+              disabled={unreadRooms.length === 0}
+            >
+              Next unread
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (lastActiveRoomIdRef.current !== null) {
+                  selectRoom(lastActiveRoomIdRef.current, { preserveLastActive: true });
+                }
+              }}
+              disabled={lastActiveRoomIdRef.current === null}
+            >
+              Back
+            </button>
+          </div>
         </header>
 
         {error !== null ? <div className="chat-ui-error-banner">{error}</div> : null}
