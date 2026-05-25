@@ -195,6 +195,19 @@ Manual checks:
 - Verify desktop integration from `time-tracker-desktop`.
 - Verify CORS from the desktop renderer origin. In desktop dev mode the actual Electron origin is
   `http://localhost:5175`; also allow `http://127.0.0.1:5175` when the renderer is loaded through loopback.
+- When the renderer origin calls the staging private IP, verify Private Network Access preflight as well as ordinary
+  CORS:
+
+  ```powershell
+  curl.exe -i -X OPTIONS "http://192.168.22.37/chat/api/rooms" `
+    -H "Origin: http://localhost:5175" `
+    -H "Access-Control-Request-Method: GET" `
+    -H "Access-Control-Request-Headers: authorization,content-type" `
+    -H "Access-Control-Request-Private-Network: true"
+  ```
+
+  Expected headers include `access-control-allow-origin: http://localhost:5175` and
+  `access-control-allow-private-network: true`.
 - Verify SSE realtime through `/chat/api/events`.
 - Verify feature-specific chat behavior before merging to `develop`.
 

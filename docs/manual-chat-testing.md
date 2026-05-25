@@ -223,6 +223,12 @@ The Electron desktop dev renderer is loaded from `http://localhost:5175` during 
 `CHAT_CORS_ALLOWED_ORIGINS` or `CORS_ALLOWED_ORIGINS`, along with `http://127.0.0.1:5175` when the desktop renderer is
 loaded through the loopback address.
 
+When that localhost renderer calls a private LAN IP such as `http://192.168.22.37`, Chromium/Electron can send a Private
+Network Access preflight before the actual bearer request. Verify `/chat/api/rooms` with
+`Access-Control-Request-Private-Network: true`; the expected OPTIONS response for an allowed origin includes
+`access-control-allow-private-network: true`. Without that header, Electron can report `TypeError: Failed to fetch`
+before the request reaches the API route even though direct curl bearer requests work.
+
 1. Generate short-lived Artem and Tester bearer tokens.
 2. Open `http://192.168.22.37/chat/` in one browser with `Bearer token` mode as Artem.
 3. Open the same URL in another browser or on another PC with `Bearer token` mode as Tester.
@@ -264,6 +270,21 @@ Expected headers:
 If Electron shows `Realtime disconnected, using polling fallback`, `EventSource.readyState` quickly becomes `2`, or a
 renderer probe fails with `TypeError: Failed to fetch` while PowerShell/curl receives `text/event-stream`, check that
 the SSE route writes CORS headers before the stream starts and that nginx forwards `Origin` for `/chat/api/events`.
+
+## Develop Post-Merge PNA Smoke - 2026-05-25
+
+Staging was redeployed with the Private Network Access CORS fix and checked from the merged desktop `develop` runtime.
+
+- OPTIONS `/chat/api/rooms` from `Origin: http://localhost:5175` with
+  `Access-Control-Request-Private-Network: true` returned `access-control-allow-private-network: true`.
+- Bearer `/rooms` from the native Electron renderer returned `200` with 3 rooms; `x-user-id` remained rejected with
+  `401`.
+- Bearer SSE observed `message.created`, `notification.created`, `room.read`, and `presence.changed`; reconnect returned
+  `text/event-stream`.
+- The native desktop overlay loaded rooms, showed `Realtime connected`, sent and received messages, updated
+  notifications/unread state, routed notification clicks, and recovered after close/reopen.
+- No `dev-user-id` fallback, renderer identity fallback, wildcard CORS, `webSecurity` disable, TLS bypass, WebSocket,
+  NATS, Redis, token logging, or secret logging was used.
 
 ## Idempotency Retry Test
 

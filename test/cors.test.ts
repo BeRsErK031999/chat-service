@@ -46,4 +46,47 @@ describe('CORS', () => {
 
     await app.close();
   });
+
+  it('allows private network preflight requests for configured origins', async () => {
+    vi.stubEnv('CORS_ALLOWED_ORIGINS', 'http://localhost:5175');
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: 'OPTIONS',
+      url: '/rooms',
+      headers: {
+        origin: 'http://localhost:5175',
+        'access-control-request-method': 'GET',
+        'access-control-request-headers': 'authorization,content-type',
+        'access-control-request-private-network': 'true',
+      },
+    });
+
+    expect(response.statusCode).toBe(204);
+    expect(response.headers['access-control-allow-origin']).toBe('http://localhost:5175');
+    expect(response.headers['access-control-allow-private-network']).toBe('true');
+
+    await app.close();
+  });
+
+  it('does not allow private network preflight requests for unknown origins', async () => {
+    vi.stubEnv('CORS_ALLOWED_ORIGINS', 'http://localhost:5175');
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: 'OPTIONS',
+      url: '/rooms',
+      headers: {
+        origin: 'http://localhost:5176',
+        'access-control-request-method': 'GET',
+        'access-control-request-private-network': 'true',
+      },
+    });
+
+    expect(response.statusCode).toBe(204);
+    expect(response.headers['access-control-allow-origin']).toBeUndefined();
+    expect(response.headers['access-control-allow-private-network']).toBeUndefined();
+
+    await app.close();
+  });
 });

@@ -15,6 +15,9 @@ const allowedHeaders = 'content-type,x-user-id,idempotency-key,authorization';
 const readHeader = (value: string | string[] | undefined): string | undefined =>
   Array.isArray(value) ? value[0] : value;
 
+const isPrivateNetworkPreflight = (value: string | string[] | undefined): boolean =>
+  readHeader(value)?.toLowerCase() === 'true';
+
 export const parseCorsAllowedOrigins = (): Set<string> => {
   const configuredOrigins = (
     process.env.CORS_ALLOWED_ORIGINS ?? process.env.CHAT_CORS_ALLOWED_ORIGINS
@@ -64,6 +67,13 @@ export const registerCors = (app: FastifyInstance): void => {
 
     for (const [name, value] of Object.entries(headers)) {
       reply.header(name, value);
+    }
+
+    if (
+      Object.keys(headers).length > 0 &&
+      isPrivateNetworkPreflight(request.headers['access-control-request-private-network'])
+    ) {
+      reply.header('access-control-allow-private-network', 'true');
     }
 
     reply
