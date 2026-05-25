@@ -251,3 +251,47 @@ For each rollout candidate, record:
 
 Keep the evidence free of secrets, tokens, raw Authorization headers, signed URLs, query-string access tokens, and
 message or notification content.
+
+## Staging Routing And Diagnostics Evidence - 2026-05-25
+
+Result: live diagnostics smoke passed after the external staging nginx routing fix and the desktop lifecycle
+stabilization.
+
+Routing:
+
+- External nginx fix variant A was applied to `/etc/nginx/conf.d/truebim-structural-calcs.conf` by removing
+  `192.168.22.37` from `server_name`, leaving `server_name truebim-calc.local;`.
+- Backup was created at `/etc/nginx/conf.d/truebim-structural-calcs.conf.bak-20260525093427`.
+- `sudo nginx -t` passed, nginx was reloaded, and nginx remained active.
+- `GET http://192.168.22.37/chat/api/health -> 200` with body `{"status":"ok"}`.
+- `GET http://192.168.22.37/chat/ -> 200` and returned the Chat Service playground HTML.
+- PNA `OPTIONS /chat/api/rooms` from `Origin: http://localhost:5175 -> 204` with
+  `access-control-allow-origin: http://localhost:5175`,
+  `access-control-allow-private-network: true`, and
+  `access-control-allow-headers: content-type,x-user-id,idempotency-key,authorization`.
+- `Host: truebim-calc.local` still routes to structural-calcs. Bare-IP structural-calcs access now falls through the
+  shared apps-platform default server, which is the accepted shared staging IP tradeoff.
+
+Bearer API/SSE smoke:
+
+- Short-lived bearer tokens were generated only in memory; token values and raw SSE URLs were not printed or recorded.
+- Bearer `/rooms -> 200`, 3 rooms loaded, and `Direct Chat` was found.
+- `x-user-id /rooms -> 401` and `/events?userId=... -> 401`.
+- Bearer SSE connected with `text/event-stream`.
+- SSE observed `message.created`, `notification.created`, `room.read`, and `presence.changed`.
+- Idempotent retry with the same `Idempotency-Key` returned the same message id.
+- Reconnect returned `text/event-stream`.
+
+Native desktop diagnostics:
+
+- The desktop dev runtime launched with `VITE_CHAT_DIAGNOSTICS=true` against
+  `http://192.168.22.37/chat/api`.
+- The native overlay opened, loaded rooms, showed `Realtime connected`, sent a message, cleared optimistic pending,
+  routed a notification, marked read, displayed presence, and restored `Direct Chat` after close/reopen.
+- Diagnostics remained sanitized. Temporary runtime logs were scanned for `accessToken`, bearer/Authorization markers,
+  `CHAT_INTERNAL_AUTH_SECRET`, renderer-prefixed signing secrets, and raw SSE URL markers; no matches were found.
+- Healthy counters after the desktop fix: `maxActive=1`, `leakMarkers=0`, expected cleanup on dev remount and overlay
+  close/reopen, no reconnect failures, and room switching emitted `room_switched` without EventSource recreation.
+
+No WebSocket, NATS, Redis, auth redesign, renderer identity fallback, wildcard CORS, TLS bypass, or Electron
+`webSecurity` downgrade was introduced.
