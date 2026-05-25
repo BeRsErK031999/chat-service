@@ -50,6 +50,9 @@ See [docs/http-api.md](docs/http-api.md) for the current HTTP endpoints.
 Operational rollout and rollback gates are tracked in
 [docs/operational-readiness.md](docs/operational-readiness.md).
 
+Developer setup, architecture boundaries, desktop integration notes, and troubleshooting are covered in
+[docs/developer-onboarding.md](docs/developer-onboarding.md).
+
 ## Commands
 
 ```bash
