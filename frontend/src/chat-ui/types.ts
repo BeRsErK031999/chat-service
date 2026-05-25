@@ -85,6 +85,13 @@ export type Notification = {
 
 export type RealtimeStatus = 'disabled' | 'connecting' | 'disconnected' | 'connected';
 
+export type PresenceStatus = 'online' | 'offline';
+
+export type PresenceState = {
+  status: PresenceStatus;
+  lastSeenAt: string;
+};
+
 export type TaskRoomLookupResult = {
   roomId: string;
   taskId: string;

@@ -1,12 +1,13 @@
 import type { ReactElement } from 'react';
 
-import type { ChatMessage, RoomListItem } from '../types';
-import { formatTime } from './formatters';
+import type { ChatMessage, PresenceState, RoomListItem } from '../types';
+import { formatTime, getPresenceLabel } from './formatters';
 
 type MessageListProps = {
   messages: ChatMessage[];
   selectedRoom: RoomListItem | null;
   currentUserId: string;
+  presenceByUserId: ReadonlyMap<string, PresenceState>;
   isLoading: boolean;
   onRetryMessage: (messageId: string) => void;
   messagesEmptyLabel?: string | undefined;
@@ -17,6 +18,7 @@ export const MessageList = ({
   messages,
   selectedRoom,
   currentUserId,
+  presenceByUserId,
   isLoading,
   onRetryMessage,
   messagesEmptyLabel = 'No messages yet.',
@@ -44,7 +46,20 @@ export const MessageList = ({
         }
       >
         <div className="chat-ui-message-meta">
-          <span>{message.senderUserId === null ? 'System' : message.senderUserId}</span>
+          <span className="chat-ui-presence-line">
+            {message.senderUserId !== null ? (
+              <span
+                className={
+                  presenceByUserId.get(message.senderUserId)?.status === 'online'
+                    ? 'chat-ui-presence-dot chat-ui-presence-online'
+                    : 'chat-ui-presence-dot'
+                }
+                aria-label={getPresenceLabel(presenceByUserId.get(message.senderUserId))}
+                title={getPresenceLabel(presenceByUserId.get(message.senderUserId))}
+              />
+            ) : null}
+            {message.senderUserId === null ? 'System' : message.senderUserId}
+          </span>
           {'clientState' in message ? (
             <span>{message.clientState === 'pending' ? 'Sending...' : 'Send failed'}</span>
           ) : (

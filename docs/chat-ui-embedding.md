@@ -227,6 +227,41 @@ Minimal task-context embed:
 />;
 ```
 
+## Task-Centric UX
+
+The first task-centric UX layer is implemented inside the reusable `frontend/src/chat-ui` source of truth without new
+backend contract requirements.
+
+Audit summary:
+
+- `ChatWidget` owns rooms state from `GET /rooms`, messages state from `GET /rooms/:roomId/messages`, notifications
+  state from `GET /notifications`, draft/send state, selected room state, and optimistic local message state.
+- `useChatRealtime` owns the SSE lifecycle and emits refresh callbacks for `message.created`, `notification.created`,
+  `notification.read`, `room.read`, and `presence.changed`.
+- Optimistic send/retry stays in `ChatWidget`: failed local messages keep the original `Idempotency-Key` and retry
+  through the same API client path.
+- `/rooms` already provides `type`, `taskId`, `projectId`, `taskRoomKind`, `lastMessage`, and `unreadCount`.
+- `/task-rooms/lookup` already provides `roomId`, `taskId`, `roomScope`, and `roomName` for host task context.
+- The minimal UX extension points are the room list, room header, message metadata, and presence event state; no route,
+  auth, or transport changes are needed.
+
+Current task-centric UI behavior:
+
+- Task rooms are grouped above ordinary recent conversations.
+- Task rooms get a task discussion label and stronger unread badge styling.
+- Room rows show existing room type/scope metadata when available.
+- The active room header shows task discussion, scope, task reference, and host source chips when those values are
+  already known.
+- Direct, group, system, internal, manager, customer, and system-events differences are rendered as lightweight labels
+  rather than a new room model.
+
+Current presence UI behavior:
+
+- Presence remains SSE-only through existing `presence.changed` events.
+- The widget stores lightweight presence state in memory by user id.
+- Message metadata renders an online/offline dot and formatted last-seen tooltip when presence is known.
+- The current user indicator follows the active realtime connection state.
+
 ## Layer Ownership
 
 The reusable layer owns:
@@ -240,6 +275,7 @@ The reusable layer owns:
 - room list, message list, composer, notifications panel, and realtime status components
 - optimistic message send state with retry using the original `Idempotency-Key`
 - lightweight presence events over the existing SSE connection
+- task-centric room grouping, scope labels, contextual room header metadata, and presence indicators
 
 The playground layer owns:
 

@@ -10,6 +10,10 @@ import {
   RealtimeStatus,
   RoomList,
   getRoomLabel,
+  getRoomScopeLabel,
+  getTaskReferenceLabel,
+  getPresenceLabel,
+  isTaskRoom,
 } from './components';
 import { useChatClient } from './hooks/useChatClient';
 import { useChatRealtime } from './hooks/useChatRealtime';
@@ -20,6 +24,7 @@ import type {
   LocalMessage,
   Message,
   Notification,
+  PresenceState,
   RoomListItem,
 } from './types';
 
@@ -65,6 +70,9 @@ export const ChatWidget = ({
   const [messages, setMessages] = useState<Message[]>([]);
   const [pendingMessages, setPendingMessages] = useState<LocalMessage[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [presenceByUserId, setPresenceByUserId] = useState<ReadonlyMap<string, PresenceState>>(
+    () => new Map(),
+  );
   const [draft, setDraft] = useState('');
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
@@ -99,6 +107,15 @@ export const ChatWidget = ({
   const selectedRoom = useMemo(
     () => rooms.find((room) => room.id === selectedRoomId) ?? null,
     [rooms, selectedRoomId],
+  );
+  const selectedRoomScopeLabel = useMemo(
+    () => (selectedRoom !== null ? getRoomScopeLabel(selectedRoom, context) : null),
+    [context, selectedRoom],
+  );
+
+  const selectedTaskReferenceLabel = useMemo(
+    () => (selectedRoom !== null ? getTaskReferenceLabel(selectedRoom) : null),
+    [selectedRoom],
   );
 
   const visibleMessages = useMemo<ChatMessage[]>(
@@ -248,6 +265,18 @@ export const ChatWidget = ({
     void loadNotifications();
   }, [loadNotifications]);
 
+  const updatePresence = useCallback((event: { userId: string } & PresenceState) => {
+    setPresenceByUserId((currentPresence) => {
+      const nextPresence = new Map(currentPresence);
+      nextPresence.set(event.userId, {
+        status: event.status,
+        lastSeenAt: event.lastSeenAt,
+      });
+
+      return nextPresence;
+    });
+  }, []);
+
   const realtimeStatus = useChatRealtime({
     client,
     selectedRoomId,
@@ -255,8 +284,17 @@ export const ChatWidget = ({
     onRoomsRefresh: triggerRoomsRefresh,
     onMessagesRefresh: triggerMessagesRefresh,
     onNotificationsRefresh: triggerNotificationsRefresh,
+    onPresenceRefresh: updatePresence,
     onRealtimeStatusChange: callbacks?.onRealtimeStatusChange,
   });
+
+  const currentUserPresence = useMemo<PresenceState>(
+    () => ({
+      status: realtimeStatus === 'connected' ? 'online' : 'offline',
+      lastSeenAt: new Date().toISOString(),
+    }),
+    [realtimeStatus],
+  );
 
   useEffect(() => {
     void refreshAll();
@@ -417,11 +455,24 @@ export const ChatWidget = ({
           {isLoadingRooms ? <span>Loading rooms...</span> : null}
           <RealtimeStatus status={realtimeStatus} />
         </div>
+        <div className="chat-ui-current-presence">
+          <span
+            className={
+              currentUserPresence.status === 'online'
+                ? 'chat-ui-presence-dot chat-ui-presence-online'
+                : 'chat-ui-presence-dot'
+            }
+            aria-label={getPresenceLabel(currentUserPresence)}
+            title={getPresenceLabel(currentUserPresence)}
+          />
+          <span>{getPresenceLabel(currentUserPresence)}</span>
+        </div>
 
         <RoomList
           rooms={rooms}
           selectedRoomId={selectedRoomId}
           isLoading={isLoadingRooms}
+          {...(context !== undefined ? { context } : {})}
           emptyLabel={labels?.roomsEmpty}
           onSelectRoom={setSelectedRoomId}
         />
@@ -436,6 +487,16 @@ export const ChatWidget = ({
                 ? getRoomLabel(selectedRoom)
                 : (labels?.title ?? 'Select a room')}
             </h2>
+            {selectedRoom !== null ? (
+              <div className="chat-ui-room-context">
+                <span>{isTaskRoom(selectedRoom) ? 'Task discussion' : selectedRoom.type}</span>
+                {selectedRoomScopeLabel !== null ? <span>{selectedRoomScopeLabel}</span> : null}
+                {selectedTaskReferenceLabel !== null ? (
+                  <span>Task {selectedTaskReferenceLabel}</span>
+                ) : null}
+                {context?.source !== undefined ? <span>{context.source}</span> : null}
+              </div>
+            ) : null}
           </div>
           <button
             type="button"
@@ -452,6 +513,7 @@ export const ChatWidget = ({
           messages={visibleMessages}
           selectedRoom={selectedRoom}
           currentUserId={currentUser.id}
+          presenceByUserId={presenceByUserId}
           isLoading={isLoadingMessages}
           onRetryMessage={(messageId) => void handleRetryMessage(messageId)}
           messagesEmptyLabel={labels?.messagesEmpty}

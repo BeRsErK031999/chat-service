@@ -82,6 +82,16 @@
   font-size: 13px;
 }
 
+.chat-ui-current-presence {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #cdd6dd;
+  color: #637083;
+  font-size: 12px;
+}
+
 .chat-ui-sidebar-header button,
 .chat-ui-chat-header button,
 .chat-ui-toolbar button,
@@ -105,11 +115,24 @@
   margin: 4px 0 0;
 }
 
+.chat-ui-room-context {
+  margin-top: 8px;
+}
+
 .chat-ui-room-list,
 .chat-ui-notification-list {
   display: grid;
   gap: 8px;
   padding: 12px;
+}
+
+.chat-ui-room-group-label {
+  margin: 4px 2px 0;
+  color: #637083;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 .chat-ui-room-item {
@@ -119,6 +142,10 @@
   padding: 12px;
   border-radius: 8px;
   text-align: left;
+}
+
+.chat-ui-room-task {
+  border-left: 4px solid #2f7d6d;
 }
 
 .chat-ui-room-item.chat-ui-active {
@@ -142,13 +169,38 @@
 
 .chat-ui-room-title-row em {
   min-width: 24px;
-  padding: 2px 7px;
+  padding: 3px 8px;
   border-radius: 999px;
   background: #c84a31;
   color: #ffffff;
   font-size: 12px;
+  font-weight: 700;
   font-style: normal;
   text-align: center;
+}
+
+.chat-ui-room-task .chat-ui-room-title-row em {
+  background: #9d3e2b;
+  box-shadow: 0 0 0 2px #fff3ee;
+}
+
+.chat-ui-room-badges,
+.chat-ui-room-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chat-ui-room-badges span,
+.chat-ui-room-context span {
+  min-height: 20px;
+  padding: 2px 7px;
+  border: 1px solid #cdd6dd;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #405064;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .chat-ui-room-preview,
@@ -208,6 +260,26 @@
   display: flex;
   justify-content: space-between;
   gap: 16px;
+}
+
+.chat-ui-presence-line {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-ui-presence-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #9aa6b2;
+  box-shadow: 0 0 0 2px #ffffff;
+}
+
+.chat-ui-presence-online {
+  background: #2f9f6d;
 }
 
 .chat-ui-composer {
