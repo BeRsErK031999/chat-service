@@ -47,6 +47,9 @@ be reused, but the final delivery target is this service's own persistence model
 
 See [docs/http-api.md](docs/http-api.md) for the current HTTP endpoints.
 
+Operational rollout and rollback gates are tracked in
+[docs/operational-readiness.md](docs/operational-readiness.md).
+
 ## Commands
 
 ```bash
