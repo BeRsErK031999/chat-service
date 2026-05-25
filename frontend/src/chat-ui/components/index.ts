@@ -4,6 +4,7 @@ export { NotificationsPanel } from './NotificationsPanel';
 export { RealtimeStatus } from './RealtimeStatus';
 export { RoomList } from './RoomList';
 export {
+  formatRelativeActivity,
   getPresenceLabel,
   getRoomLabel,
   getRoomScopeLabel,

@@ -260,8 +260,13 @@ Current task-centric UI behavior:
   highlight is best-effort for messages present in the currently loaded message window.
 - Task rooms get a task discussion label and stronger unread badge styling.
 - Room rows show existing room type/scope metadata when available.
+- Room rows now surface lightweight workflow awareness from existing room data: unread rooms are marked as needing
+  attention, caught-up rooms show relative recent activity, and task discussions keep the stronger unread treatment.
 - The active room header shows task discussion, scope, task reference, and host source chips when those values are
   already known.
+- The active room header also shows caught-up/unread state, last activity, and known active participants inferred from
+  visible messages plus existing `presence.changed` state.
+- Notifications are ordered unread-first and recent-first, with priority/read labels for quicker attention scanning.
 - Direct, group, system, internal, manager, customer, and system-events differences are rendered as lightweight labels
   rather than a new room model.
 
@@ -286,6 +291,7 @@ The reusable layer owns:
 - optimistic message send state with retry using the original `Idempotency-Key`
 - lightweight presence events over the existing SSE connection
 - task-centric room grouping, scope labels, contextual room header metadata, and presence indicators
+- workflow awareness cues derived from existing rooms, notifications, visible messages, and SSE presence state
 
 The playground layer owns:
 

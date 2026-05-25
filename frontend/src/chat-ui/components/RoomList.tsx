@@ -3,6 +3,7 @@ import { Fragment } from 'react';
 
 import type { ChatWidgetContext, RoomListItem } from '../types';
 import {
+  formatRelativeActivity,
   formatRoomTypeLabel,
   formatTime,
   getPreview,
@@ -99,6 +100,14 @@ const getVisibleRooms = (
   return [...matchingRooms].sort(compareRoomsByWorkflowPriority);
 };
 
+const getRoomAttentionLabel = (room: RoomListItem): string => {
+  if (room.unreadCount > 0) {
+    return room.unreadCount === 1 ? 'Needs attention' : `${room.unreadCount} unread`;
+  }
+
+  return formatRelativeActivity(room.lastMessageAt);
+};
+
 export const RoomList = ({
   rooms,
   selectedRoomId,
@@ -182,6 +191,7 @@ export const RoomList = ({
           {group.rooms.map((room) => {
             const activeClassName = room.id === selectedRoomId ? ' chat-ui-active' : '';
             const taskClassName = isTaskRoom(room) ? ' chat-ui-room-task' : '';
+            const unreadClassName = room.unreadCount > 0 ? ' chat-ui-room-unread' : '';
             const scopeLabel = getRoomScopeLabel(room, context);
 
             return (
@@ -189,7 +199,7 @@ export const RoomList = ({
                 key={room.id}
                 type="button"
                 aria-current={room.id === selectedRoomId ? 'true' : undefined}
-                className={`chat-ui-room-item${activeClassName}${taskClassName}`}
+                className={`chat-ui-room-item${activeClassName}${taskClassName}${unreadClassName}`}
                 onClick={() => onSelectRoom(room.id)}
               >
                 <span className="chat-ui-room-title-row">
@@ -201,7 +211,10 @@ export const RoomList = ({
                   {scopeLabel !== null ? <span>{scopeLabel}</span> : null}
                 </span>
                 <span className="chat-ui-room-preview">{getPreview(room.lastMessage)}</span>
-                <span className="chat-ui-room-meta">{formatTime(room.lastMessageAt)}</span>
+                <span className="chat-ui-room-activity">
+                  <span>{getRoomAttentionLabel(room)}</span>
+                  <span className="chat-ui-room-meta">{formatTime(room.lastMessageAt)}</span>
+                </span>
               </button>
             );
           })}

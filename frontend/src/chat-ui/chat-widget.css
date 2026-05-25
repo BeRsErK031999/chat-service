@@ -165,6 +165,11 @@
   border-left: 4px solid #2f7d6d;
 }
 
+.chat-ui-room-unread {
+  border-color: #d6a43f;
+  background: #fffaf0;
+}
+
 .chat-ui-room-item.chat-ui-active {
   border-color: #2f7d6d;
   background: #e8f4f1;
@@ -202,14 +207,18 @@
 }
 
 .chat-ui-room-badges,
-.chat-ui-room-context {
+.chat-ui-room-context,
+.chat-ui-room-awareness,
+.chat-ui-notification-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
 .chat-ui-room-badges span,
-.chat-ui-room-context span {
+.chat-ui-room-context span,
+.chat-ui-room-awareness span,
+.chat-ui-notification-meta span {
   min-height: 20px;
   padding: 2px 7px;
   border: 1px solid #cdd6dd;
@@ -220,12 +229,39 @@
   font-weight: 700;
 }
 
+.chat-ui-room-awareness {
+  margin-top: 8px;
+}
+
+.chat-ui-room-awareness span,
+.chat-ui-notification-meta span {
+  background: #f8fafb;
+  color: #637083;
+}
+
+.chat-ui-room-awareness .chat-ui-attention,
+.chat-ui-notification-unread .chat-ui-notification-meta span:first-child {
+  border-color: #d6a43f;
+  background: #fff8e9;
+  color: #7b5617;
+}
+
 .chat-ui-room-preview,
 .chat-ui-room-meta,
 .chat-ui-message-meta,
 .chat-ui-notification time {
   color: #637083;
   font-size: 12px;
+}
+
+.chat-ui-room-activity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #405064;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .chat-ui-chat-panel {

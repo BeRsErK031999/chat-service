@@ -11,6 +11,44 @@ export const formatTime = (value: string | null): string => {
   }).format(new Date(value));
 };
 
+export const formatRelativeActivity = (value: string | null): string => {
+  if (value === null) {
+    return 'No activity yet';
+  }
+
+  const timestamp = new Date(value).getTime();
+
+  if (Number.isNaN(timestamp)) {
+    return 'Activity unknown';
+  }
+
+  const elapsedMs = Date.now() - timestamp;
+  const elapsedMinutes = Math.max(0, Math.floor(elapsedMs / 60_000));
+
+  if (elapsedMinutes < 1) {
+    return 'Active just now';
+  }
+
+  if (elapsedMinutes < 5) {
+    return 'Active now';
+  }
+
+  if (elapsedMinutes < 60) {
+    return `Active ${elapsedMinutes}m ago`;
+  }
+
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+
+  if (elapsedHours < 24) {
+    return `Active ${elapsedHours}h ago`;
+  }
+
+  return `Active ${new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(value))}`;
+};
+
 export const getRoomLabel = (room: RoomListItem): string =>
   room.name ?? room.taskId ?? `${room.type.toLowerCase()} room`;
 

@@ -9,6 +9,7 @@ import {
   NotificationsPanel,
   RealtimeStatus,
   RoomList,
+  formatRelativeActivity,
   getRoomLabel,
   getRoomScopeLabel,
   getTaskReferenceLabel,
@@ -134,6 +135,21 @@ export const ChatWidget = ({
   );
 
   const lastSequence = visibleMessages[visibleMessages.length - 1]?.sequence ?? 0;
+  const activeParticipantCount = useMemo(() => {
+    const activeParticipantIds = new Set<string>();
+
+    for (const message of visibleMessages) {
+      if (
+        message.senderUserId !== null &&
+        message.senderUserId !== currentUser.id &&
+        presenceByUserId.get(message.senderUserId)?.status === 'online'
+      ) {
+        activeParticipantIds.add(message.senderUserId);
+      }
+    }
+
+    return activeParticipantIds.size;
+  }, [currentUser.id, presenceByUserId, visibleMessages]);
 
   useEffect(() => {
     if (taskRoomLookupContext === null) {
@@ -577,6 +593,23 @@ export const ChatWidget = ({
                   <span>Task {selectedTaskReferenceLabel}</span>
                 ) : null}
                 {context?.source !== undefined ? <span>{context.source}</span> : null}
+              </div>
+            ) : null}
+            {selectedRoom !== null ? (
+              <div className="chat-ui-room-awareness">
+                <span className={selectedRoom.unreadCount > 0 ? 'chat-ui-attention' : undefined}>
+                  {selectedRoom.unreadCount > 0
+                    ? `${selectedRoom.unreadCount} unread`
+                    : 'Caught up'}
+                </span>
+                <span>{formatRelativeActivity(selectedRoom.lastMessageAt)}</span>
+                {activeParticipantCount > 0 ? (
+                  <span>
+                    {activeParticipantCount === 1
+                      ? '1 participant active'
+                      : `${activeParticipantCount} participants active`}
+                  </span>
+                ) : null}
               </div>
             ) : null}
           </div>
