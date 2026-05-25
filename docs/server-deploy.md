@@ -150,6 +150,8 @@ Do not commit private keys, passwords, or real server `.env` files. Do not write
 - runs `docker compose ps`
 - checks `http://127.0.0.1:4100/health`
 - checks `http://127.0.0.1:4101/`
+- checks `http://192.168.22.37/chat/api/health` and requires exactly `{"status":"ok"}`
+- checks `http://192.168.22.37/chat/`
 
 It checks SSH access before building Docker images. With `CHAT_SERVICE_DEPLOY_SSH_KEY`, the script passes `-i <key>` to
 `ssh` and `scp`. Without it, the script uses normal `ssh` and `scp`, which can use your SSH config or agent. If both
@@ -334,6 +336,11 @@ sensitive while this fallback is in use.
 
 `deploy/nginx.chat-service.conf` is a location-only include for the existing server block. Do not convert it into a full
 `server {}` config unless the host nginx layout changes.
+
+The active server block for the staging IP or hostname must include the chat-service locations before any generic
+`location /` frontend fallback. If another app-specific server block claims `192.168.22.37`, it must either stop
+claiming the shared staging IP or include the chat-service locations as well. Otherwise `/chat/api/health` can be served
+by an unrelated frontend shell while `127.0.0.1:4100/health` still looks healthy.
 
 The SSE location `/chat/api/events` must keep:
 

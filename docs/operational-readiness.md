@@ -93,6 +93,8 @@ After deploy:
   curl.exe -i "http://192.168.22.37/chat/api/health"
   ```
 
+  The response body must be `{"status":"ok"}` from `chat-service`. If this returns a frontend HTML shell, the active
+  nginx server block for the staging IP is catching `/chat/api/*` before the chat-service location include.
 - Confirm `/chat/` opens and the playground can use bearer mode.
 - Confirm nginx still preserves SSE headers for `/chat/api/events`.
 

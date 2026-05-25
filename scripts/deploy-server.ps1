@@ -270,6 +270,12 @@ Invoke-Remote "curl -fsS http://127.0.0.1:4100/health"
 Write-Host "Checking frontend endpoint..."
 Invoke-Remote "curl -fsS http://127.0.0.1:4101/ >/dev/null"
 
+Write-Host "Checking public chat API route..."
+Invoke-Remote "curl -fsS --max-time 10 http://$ServerHost/chat/api/health | grep -qx '{`"status`":`"ok`"}'"
+
+Write-Host "Checking public chat frontend route..."
+Invoke-Remote "curl -fsS --max-time 10 http://$ServerHost/chat/ >/dev/null"
+
 if ($SkipCleanup) {
   Write-Host "Skipping server cleanup because -SkipCleanup was provided."
 } else {
