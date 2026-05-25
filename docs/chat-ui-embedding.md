@@ -45,7 +45,7 @@ If `auth` is omitted, the widget uses `currentUser.id` as dev auth. Production h
 | `mode` | no | `"full"`, `"embedded"`, or `"compact"`. Defaults to `"full"`. Compact hides notifications. |
 | `enableRealtime` | no | Enables SSE realtime when `true`. Defaults to `true`; polling fallback still runs when disconnected. |
 | `className` | no | Optional class added to the widget shell for host-specific layout. |
-| `callbacks` | no | Host callbacks for unread count, room changes, message sent, auth/access errors, realtime status, close, and notifications. |
+| `callbacks` | no | Host callbacks for unread count, room changes, message sent, task actions, auth/access errors, realtime status, close, and notifications. |
 | `labels` | no | Host text overrides for title and empty states. |
 
 ## Types
@@ -78,6 +78,8 @@ type ChatWidgetCallbacks = {
   onUnreadCountChange?: (count: number) => void;
   onRoomChange?: (roomId: string | null) => void;
   onMessageSent?: (message: Message) => void;
+  onTaskOpen?: (taskId: string) => void;
+  onTaskReferenceCopy?: (taskReference: string) => void;
   onNotificationClick?: (notification: Notification) => void;
   onNotificationReceived?: (notification: Notification) => void;
   onAuthError?: (error: Error) => void;
@@ -94,6 +96,10 @@ type ChatWidgetCallbacks = {
 
 `onRoomChange` fires when the selected room id changes. `onClose` only adds a close button when the host provides the
 callback, so the playground does not show close controls.
+
+`onTaskOpen` and `onTaskReferenceCopy` are platform-neutral workflow action hooks. The reusable widget only emits the
+task id or task reference; desktop shells, browser shells, and future hosts decide how to open tasks or write to a
+host-safe clipboard. If `onTaskReferenceCopy` is not provided, the browser widget attempts `navigator.clipboard`.
 
 ## Desktop Example
 
@@ -117,6 +123,8 @@ callback, so the playground does not show close controls.
   callbacks={{
     onUnreadCountChange: (count) => shellBadges.setChatUnread(count),
     onRoomChange: (roomId) => shellState.setChatRoomId(roomId),
+    onTaskOpen: (taskId) => shellTasks.open(taskId),
+    onTaskReferenceCopy: (taskReference) => shellClipboard.writeText(taskReference),
     onAccessDenied: (error) => shellToasts.error(error.message),
     onRealtimeStatusChange: (status) => shellTelemetry.chatRealtime(status),
     onClose: () => shellPanels.close('chat'),
@@ -146,6 +154,8 @@ callback, so the playground does not show close controls.
   callbacks={{
     onUnreadCountChange: setChatUnreadCount,
     onMessageSent: (message) => analytics.track('chat_message_sent', { roomId: message.roomId }),
+    onTaskOpen: (taskId) => openTask(taskId),
+    onTaskReferenceCopy: (taskReference) => copyToClipboard(taskReference),
     onNotificationClick: (notification) => openTaskFromNotification(notification),
     onAuthError: () => redirectToLogin(),
     onAccessDenied: (error) => showToast(error.message),
@@ -256,8 +266,16 @@ Current task-centric UI behavior:
 - Keyboard workflow supports `Ctrl`/`Cmd+K` or `/` to focus room search, `ArrowUp`/`ArrowDown` to switch visible rooms,
   `Enter` to open the first match, and `Escape` to clear or leave search.
 - Selecting a room focuses the composer so daily task discussion flow is search, open, type.
+- Command-like workflow actions are available in the room header: jump to task, copy task reference, open a related
+  discussion, mark read, mark unread, reopen a recent task room, jump to next unread, and return to the previous
+  discussion.
+- Keyboard traversal also supports `Alt+ArrowUp`/`Alt+ArrowDown` for previous/next room,
+  `Alt+Shift+ArrowUp`/`Alt+Shift+ArrowDown` for previous/next unread room, `Ctrl`/`Cmd+Shift+A` for active discussion
+  cycling, and `Ctrl`/`Cmd+Shift+L` to return to the previous discussion.
 - Hosts can route notification clicks by passing `navigationTarget`; room selection is guaranteed, while message
   highlight is best-effort for messages present in the currently loaded message window.
+- Hosts can preserve task/discussion context after shell reopen by passing the last observed `onRoomChange` value back
+  as `initialRoomId`. `context.roomId` still takes precedence for explicit routing.
 - Task rooms get a task discussion label and stronger unread badge styling.
 - Room rows show existing room type/scope metadata when available.
 - Room rows now surface lightweight workflow awareness from existing room data: unread rooms are marked as needing
@@ -292,6 +310,8 @@ The reusable layer owns:
 - lightweight presence events over the existing SSE connection
 - task-centric room grouping, scope labels, contextual room header metadata, and presence indicators
 - workflow awareness cues derived from existing rooms, notifications, visible messages, and SSE presence state
+- command-like navigation/action behavior, including unread traversal, active discussion cycling, previous discussion
+  return, recent task room recall, local mark-unread emphasis, and platform-neutral task action callbacks
 
 The playground layer owns:
 
@@ -312,7 +332,11 @@ tokens and never receives `CHAT_INTERNAL_AUTH_SECRET`.
 - The chat UI is still styled by the app-level `frontend/src/styles.css`.
 - SSE remains the realtime transport; WebSocket is intentionally not added.
 - Presence uses in-process SSE connection state plus `User.lastSeenAt`; it is not a durable global fanout layer.
-- No desktop shell or web gantt integration exists yet.
+- Mark unread is a local attention-management affordance in the widget; the current backend API only persists mark read.
+- Message highlighting through `navigationTarget.messageId` is best-effort for messages present in the loaded message
+  window.
+- Browser automation smoke may be unavailable in some local Codex sessions; do not record browser playground success
+  unless the browser tooling actually ran.
 
 ## Staging Presence/Reconnection Smoke on 2026-05-22
 

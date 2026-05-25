@@ -175,6 +175,33 @@ rooms.
 8. In the `Tester` browser, click `Mark read` on the notification.
 9. Confirm the notification remains visible but is no longer counted as unread.
 
+## Workflow UX Smoke
+
+Use this checklist after task-centric UX or desktop snapshot changes. Record only what was actually observed.
+
+1. Open `/chat/` in bearer mode and confirm rooms load with `Realtime connected`.
+2. Confirm task rooms are grouped separately and unread/activity cues render on room rows.
+3. Confirm search filters by room text, task id, project id, type, scope, and latest message preview.
+4. Press `Ctrl`/`Cmd+K` or `/` and confirm search receives focus.
+5. With search focused, use `ArrowUp`/`ArrowDown` to switch visible rooms and `Enter` to open the first match.
+6. Confirm opening a room focuses the composer.
+7. Use the header actions to jump to next unread, return to the previous discussion, reopen a recent task room, open a
+   related discussion, mark read, and mark unread.
+8. Use keyboard traversal: `Alt+ArrowUp`/`Alt+ArrowDown` for previous/next room,
+   `Alt+Shift+ArrowUp`/`Alt+Shift+ArrowDown` for previous/next unread room, `Ctrl`/`Cmd+Shift+A` for active discussion
+   cycling, and `Ctrl`/`Cmd+Shift+L` for previous discussion.
+9. In a task room, confirm task reference chips render and `Copy ref` writes the task reference when browser clipboard is
+   available.
+10. Route a notification through `navigationTarget` and confirm the target room opens. Message highlight is best-effort
+    when the target message is in the loaded message window.
+11. Send a message and confirm the peer client receives `message.created` and `notification.created`.
+12. Retry the same send path with the same `Idempotency-Key` through the API and confirm one persisted message id.
+13. Mark a room read and confirm `room.read` updates unread state.
+14. Confirm presence indicators render when `presence.changed` events are observed.
+
+If browser automation or a second visual client is unavailable, write that limitation down instead of replacing it with a
+local code assertion.
+
 ## Realtime SSE Test
 
 The reusable chat UI opens an `EventSource` connection built from the configured `apiBaseUrl`.
