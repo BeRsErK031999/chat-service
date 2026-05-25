@@ -126,6 +126,23 @@
   padding: 12px;
 }
 
+.chat-ui-room-search {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding-bottom: 4px;
+  background: #f8fafb;
+}
+
+.chat-ui-room-search input {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid #b9c5cf;
+  border-radius: 6px;
+  padding: 0 10px;
+  background: #ffffff;
+}
+
 .chat-ui-room-group-label {
   margin: 4px 2px 0;
   color: #637083;

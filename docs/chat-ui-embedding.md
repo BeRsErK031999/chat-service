@@ -248,6 +248,12 @@ Audit summary:
 Current task-centric UI behavior:
 
 - Task rooms are grouped above ordinary recent conversations.
+- Rooms are ordered unread-first and then by recent activity inside each group.
+- The room list includes a local search/filter box covering room name, type, scope, task id, project id, and latest
+  message preview.
+- Keyboard workflow supports `Ctrl`/`Cmd+K` or `/` to focus room search, `ArrowUp`/`ArrowDown` to switch visible rooms,
+  `Enter` to open the first match, and `Escape` to clear or leave search.
+- Selecting a room focuses the composer so daily task discussion flow is search, open, type.
 - Task rooms get a task discussion label and stronger unread badge styling.
 - Room rows show existing room type/scope metadata when available.
 - The active room header shows task discussion, scope, task reference, and host source chips when those values are

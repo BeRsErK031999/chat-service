@@ -73,6 +73,7 @@ export const ChatWidget = ({
   const [presenceByUserId, setPresenceByUserId] = useState<ReadonlyMap<string, PresenceState>>(
     () => new Map(),
   );
+  const [roomSearchQuery, setRoomSearchQuery] = useState('');
   const [draft, setDraft] = useState('');
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
@@ -82,6 +83,8 @@ export const ChatWidget = ({
   const lastUnreadCountRef = useRef<number | null>(null);
   const lastRoomChangeRef = useRef<string | null | undefined>(undefined);
   const deniedRoomIdRef = useRef<string | null>(null);
+  const roomSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const composerInputRef = useRef<HTMLInputElement | null>(null);
 
   const reportError = useCallback(
     (caughtError: unknown, fallback: string, notifyAccessDenied = false): string => {
@@ -322,6 +325,54 @@ export const ChatWidget = ({
     callbacks?.onRoomChange?.(selectedRoomId);
   }, [callbacks, selectedRoomId]);
 
+  useEffect(() => {
+    if (selectedRoomId === null) {
+      return;
+    }
+
+    composerInputRef.current?.focus();
+  }, [selectedRoomId]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: globalThis.KeyboardEvent): void => {
+      const target = event.target;
+      const isEditableTarget =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement;
+
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        roomSearchInputRef.current?.focus();
+        roomSearchInputRef.current?.select();
+        return;
+      }
+
+      if (event.key === 'Escape' && document.activeElement === roomSearchInputRef.current) {
+        if (roomSearchQuery.length > 0) {
+          event.preventDefault();
+          setRoomSearchQuery('');
+          return;
+        }
+
+        roomSearchInputRef.current?.blur();
+      }
+
+      if (isEditableTarget) {
+        return;
+      }
+
+      if (event.key === '/') {
+        event.preventDefault();
+        roomSearchInputRef.current?.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [roomSearchQuery]);
+
   const sendDraft = async (body: string, idempotencyKey: string, localMessageId: string): Promise<void> => {
     if (selectedRoomId === null) {
       return;
@@ -473,7 +524,11 @@ export const ChatWidget = ({
           selectedRoomId={selectedRoomId}
           isLoading={isLoadingRooms}
           {...(context !== undefined ? { context } : {})}
+          searchInputRef={roomSearchInputRef}
+          searchQuery={roomSearchQuery}
           emptyLabel={labels?.roomsEmpty}
+          searchEmptyLabel="No rooms match this workflow."
+          onSearchQueryChange={setRoomSearchQuery}
           onSelectRoom={setSelectedRoomId}
         />
       </aside>
@@ -524,6 +579,7 @@ export const ChatWidget = ({
           draft={draft}
           disabled={selectedRoom === null}
           isSending={isSending}
+          inputRef={composerInputRef}
           onDraftChange={setDraft}
           onSend={(event) => void handleSend(event)}
         />
