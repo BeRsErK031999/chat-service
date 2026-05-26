@@ -10,9 +10,17 @@ const sections = [
   {
     title: 'Room switching stress',
     items: [
-      'Switch rooms at least 25 times using click, search, keyboard traversal, next unread, related, recent task, and back actions.',
+      'Switch rooms at least 25 times using click, ActivityPanel items, search, keyboard traversal, next unread, related, recent task, and back actions.',
       'Expected: room_switched count increases, activeEventSourceCount remains 1, and realtime status does not flicker during ordinary room switches.',
       'Unhealthy: EventSource reconnects on every room switch, duplicate listeners grow, or reconnect logs spam without a network change.',
+    ],
+  },
+  {
+    title: 'Activity inbox stress',
+    items: [
+      'Click Needs attention and Recent activity items repeatedly, including entries with messageId and taskId targets.',
+      'Expected: selected room and message highlight follow the normalized target, Back returns to the previous discussion, and ChatWidget stays mounted.',
+      'Unhealthy: activity clicks recreate the EventSource, clear selected room continuity unexpectedly, or emit token/accessToken values in diagnostics.',
     ],
   },
   {

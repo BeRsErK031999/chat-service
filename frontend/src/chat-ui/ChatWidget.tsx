@@ -823,30 +823,33 @@ export const ChatWidget = ({
     }
   };
 
-  const handleActivityItemClick = (item: ChatActivityItem): void => {
-    setLocalNavigationTarget(item.target);
-    setRoomSearchQuery('');
-    callbacks?.onNavigationTargetChange?.(item.target);
+  const handleActivityItemClick = useCallback(
+    (item: ChatActivityItem): void => {
+      setLocalNavigationTarget(item.target);
+      setRoomSearchQuery('');
+      callbacks?.onNavigationTargetChange?.(item.target);
 
-    if (item.target.roomId !== undefined) {
-      selectRoom(item.target.roomId);
-    }
-
-    if (item.target.taskId !== undefined) {
-      recentTaskRoomIdsRef.current = [
-        ...rooms.filter((room) => room.taskId === item.target.taskId).map((room) => room.id),
-        ...recentTaskRoomIdsRef.current,
-      ].slice(0, 5);
-    }
-
-    if (item.notificationId !== undefined) {
-      const notification = notifications.find((candidate) => candidate.id === item.notificationId);
-
-      if (notification !== undefined) {
-        callbacks?.onNotificationClick?.(notification);
+      if (item.target.roomId !== undefined) {
+        selectRoom(item.target.roomId);
       }
-    }
-  };
+
+      if (item.target.taskId !== undefined) {
+        recentTaskRoomIdsRef.current = [
+          ...rooms.filter((room) => room.taskId === item.target.taskId).map((room) => room.id),
+          ...recentTaskRoomIdsRef.current,
+        ].slice(0, 5);
+      }
+
+      if (item.notificationId !== undefined) {
+        const notification = notifications.find((candidate) => candidate.id === item.notificationId);
+
+        if (notification !== undefined) {
+          callbacks?.onNotificationClick?.(notification);
+        }
+      }
+    },
+    [callbacks, notifications, rooms, selectRoom],
+  );
 
   const shellClassName = ['chat-ui-root', `chat-ui-${mode}`, className].filter(Boolean).join(' ');
 
