@@ -138,7 +138,9 @@ Rules:
 - `taskId` preserves workflow context and primes recent task continuity; it does not create task rooms.
 - `source` records intent for notification, task, and future activity-feed surfaces.
 - empty strings and unsupported sources are dropped by `normalizeNavigationTarget`.
-- `serializeNavigationTarget` and `parseNavigationTarget` provide query-string semantics for future hosts without
+- `serializeCanonicalNavigationTarget` emits a versioned `chat-nav:v1?...` string with stable field ordering for
+  future deep links, reopen continuity, activity restoration, and cross-entry workflow navigation.
+- `parseNavigationTarget` accepts both the canonical serialized form and legacy query-string targets without
   introducing a router framework.
 - `navigationTargetFromNotification` maps backend notifications into the same model; notifications without a room use
   safe host fallback behavior.

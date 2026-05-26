@@ -12,6 +12,8 @@ const navigationSources = new Set<ChatWidgetNavigationSource>([
   'activity',
 ]);
 
+export const CANONICAL_NAVIGATION_TARGET_PREFIX = 'chat-nav:v1';
+
 const cleanString = (value: string | null | undefined): string | undefined => {
   const trimmed = value?.trim();
   return trimmed === undefined || trimmed.length === 0 ? undefined : trimmed;
@@ -22,13 +24,49 @@ const cleanSource = (value: string | null | undefined): ChatWidgetNavigationSour
     ? (value as ChatWidgetNavigationSource)
     : undefined;
 
+const createNavigationTargetParams = (
+  target: Omit<NormalizedChatWidgetNavigationTarget, 'id'>,
+): URLSearchParams => {
+  const params = new URLSearchParams();
+
+  if (target.roomId !== undefined) {
+    params.set('roomId', target.roomId);
+  }
+
+  if (target.messageId !== undefined) {
+    params.set('messageId', target.messageId);
+  }
+
+  if (target.taskId !== undefined) {
+    params.set('taskId', target.taskId);
+  }
+
+  if (target.source !== undefined) {
+    params.set('source', target.source);
+  }
+
+  return params;
+};
+
+const serializeNavigationTargetFields = (
+  target: Omit<NormalizedChatWidgetNavigationTarget, 'id'>,
+): string => createNavigationTargetParams(target).toString();
+
+const serializeCanonicalNavigationTargetFields = (
+  target: Omit<NormalizedChatWidgetNavigationTarget, 'id'>,
+): string => `${CANONICAL_NAVIGATION_TARGET_PREFIX}?${serializeNavigationTargetFields(target)}`;
+
 const createNavigationTargetId = (target: Omit<NormalizedChatWidgetNavigationTarget, 'id'>): string =>
-  [
-    target.source ?? 'chat',
-    target.roomId ?? '',
-    target.messageId ?? '',
-    target.taskId ?? '',
-  ].join(':');
+  serializeCanonicalNavigationTargetFields(target);
+
+const navigationTargetParamsFromString = (value: string): URLSearchParams => {
+  if (value.startsWith(CANONICAL_NAVIGATION_TARGET_PREFIX)) {
+    const serialized = value.slice(CANONICAL_NAVIGATION_TARGET_PREFIX.length);
+    return new URLSearchParams(serialized.startsWith('?') ? serialized.slice(1) : serialized);
+  }
+
+  return new URLSearchParams(value.startsWith('?') ? value.slice(1) : value);
+};
 
 export const normalizeNavigationTarget = (
   target: ChatWidgetNavigationTarget | null | undefined,
@@ -65,25 +103,19 @@ export const serializeNavigationTarget = (
     return '';
   }
 
-  const params = new URLSearchParams();
+  return serializeNavigationTargetFields(normalized);
+};
 
-  if (normalized.roomId !== undefined) {
-    params.set('roomId', normalized.roomId);
+export const serializeCanonicalNavigationTarget = (
+  target: ChatWidgetNavigationTarget | null | undefined,
+): string => {
+  const normalized = normalizeNavigationTarget(target);
+
+  if (normalized === null) {
+    return '';
   }
 
-  if (normalized.messageId !== undefined) {
-    params.set('messageId', normalized.messageId);
-  }
-
-  if (normalized.taskId !== undefined) {
-    params.set('taskId', normalized.taskId);
-  }
-
-  if (normalized.source !== undefined) {
-    params.set('source', normalized.source);
-  }
-
-  return params.toString();
+  return serializeCanonicalNavigationTargetFields(normalized);
 };
 
 export const parseNavigationTarget = (
@@ -93,10 +125,7 @@ export const parseNavigationTarget = (
     return null;
   }
 
-  const params =
-    typeof value === 'string'
-      ? new URLSearchParams(value.startsWith('?') ? value.slice(1) : value)
-      : value;
+  const params = typeof value === 'string' ? navigationTargetParamsFromString(value) : value;
 
   const source = cleanSource(params.get('source'));
   const roomId = params.get('roomId') ?? undefined;

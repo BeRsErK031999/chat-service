@@ -58,7 +58,7 @@ describe('chat UI activity items', () => {
       kind: 'unread-room',
       attentionState: 'attention-needed',
       target: {
-        id: 'activity:room-1::task-1',
+        id: 'chat-nav:v1?roomId=room-1&taskId=task-1&source=activity',
         roomId: 'room-1',
         taskId: 'task-1',
         source: 'activity',

@@ -14,10 +14,12 @@ export {
   shouldEmitInteractionHint,
 } from './interaction';
 export {
+  CANONICAL_NAVIGATION_TARGET_PREFIX,
   navigationTargetFromNotification,
   navigationTargetFromRoom,
   normalizeNavigationTarget,
   parseNavigationTarget,
+  serializeCanonicalNavigationTarget,
   serializeNavigationTarget,
 } from './navigation';
 export type {

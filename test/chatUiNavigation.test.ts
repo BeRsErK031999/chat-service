@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  CANONICAL_NAVIGATION_TARGET_PREFIX,
   navigationTargetFromNotification,
   normalizeNavigationTarget,
   parseNavigationTarget,
+  serializeCanonicalNavigationTarget,
   serializeNavigationTarget,
 } from '../frontend/src/chat-ui/navigation.js';
 import type { Notification } from '../frontend/src/chat-ui/types.js';
@@ -42,11 +44,41 @@ describe('chat UI navigation targets', () => {
 
     expect(serialized).toBe('roomId=room-1&messageId=message-1&taskId=task-1&source=activity');
     expect(parseNavigationTarget(`?${serialized}`)).toEqual({
-      id: 'activity:room-1:message-1:task-1',
+      id: `${CANONICAL_NAVIGATION_TARGET_PREFIX}?roomId=room-1&messageId=message-1&taskId=task-1&source=activity`,
       roomId: 'room-1',
       messageId: 'message-1',
       taskId: 'task-1',
       source: 'activity',
+    });
+  });
+
+  it('serializes canonical navigation targets with a versioned stable envelope', () => {
+    const target = {
+      source: 'notification' as const,
+      taskId: ' task:with spaces ',
+      messageId: 'message-1',
+      roomId: 'room-1',
+    };
+
+    const canonical = serializeCanonicalNavigationTarget(target);
+
+    expect(canonical).toBe(
+      `${CANONICAL_NAVIGATION_TARGET_PREFIX}?roomId=room-1&messageId=message-1&taskId=task%3Awith+spaces&source=notification`,
+    );
+    expect(parseNavigationTarget(canonical)).toEqual({
+      id: canonical,
+      roomId: 'room-1',
+      messageId: 'message-1',
+      taskId: 'task:with spaces',
+      source: 'notification',
+    });
+  });
+
+  it('parses legacy query strings through the canonical normalized id', () => {
+    expect(parseNavigationTarget('source=unknown&taskId=task-1&roomId=room-1')).toEqual({
+      id: `${CANONICAL_NAVIGATION_TARGET_PREFIX}?roomId=room-1&taskId=task-1`,
+      roomId: 'room-1',
+      taskId: 'task-1',
     });
   });
 
