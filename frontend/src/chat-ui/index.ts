@@ -22,6 +22,15 @@ export {
   serializeCanonicalNavigationTarget,
   serializeNavigationTarget,
 } from './navigation';
+export {
+  DEFAULT_NAVIGATION_TARGET_CONTINUITY_TTL_MS,
+  NAVIGATION_CONTINUITY_STORAGE_KEY,
+  clearRememberedNavigationTarget,
+  getRememberedNavigationTarget,
+  getRememberedNavigationTargetResult,
+  rememberNavigationTarget,
+  restoreNavigationTargetFromCanonical,
+} from './navigationContinuity';
 export type {
   BuildChatActivityItemsInput,
   ChatActivitySections,
@@ -29,6 +38,10 @@ export type {
 export type {
   ChatInteractionHintInput,
 } from './interaction';
+export type {
+  RememberedNavigationTargetResult,
+  RememberedNavigationTargetStatus,
+} from './navigationContinuity';
 export type {
   ChatActivityAttentionState,
   ChatActivityItem,

@@ -142,11 +142,14 @@ Rules:
   future deep links, reopen continuity, activity restoration, and cross-entry workflow navigation.
 - `parseNavigationTarget` accepts both the canonical serialized form and legacy query-string targets without
   introducing a router framework.
+- `rememberNavigationTarget`, `getRememberedNavigationTarget`, and `clearRememberedNavigationTarget` provide
+  session-local continuity restore. They store only the canonical target string and timestamp in `sessionStorage`, with
+  an in-memory fallback when browser storage is unavailable.
 - `navigationTargetFromNotification` maps backend notifications into the same model; notifications without a room use
   safe host fallback behavior.
 
-This intentionally does not add browser history redesign, Electron protocol handlers, backend deep-link APIs, or an
-activity feed.
+This intentionally does not add browser history redesign, Electron protocol handlers, backend deep-link APIs, backend
+persistence, or an activity feed.
 
 ## Activity Target Foundation
 

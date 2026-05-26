@@ -151,7 +151,11 @@ export type ChatRealtimeDiagnosticKind =
   | 'reconnect_succeeded'
   | 'reconnect_failed'
   | 'room_switched'
-  | 'polling_refresh';
+  | 'polling_refresh'
+  | 'navigation_target_remembered'
+  | 'navigation_target_restored'
+  | 'navigation_target_restore_skipped'
+  | 'navigation_target_restore_failed';
 
 export type ChatRealtimeDiagnostic = {
   kind: ChatRealtimeDiagnosticKind;

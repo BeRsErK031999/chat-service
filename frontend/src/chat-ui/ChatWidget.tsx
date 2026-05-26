@@ -21,6 +21,10 @@ import { useChatClient } from './hooks/useChatClient';
 import { useChatRealtime } from './hooks/useChatRealtime';
 import { normalizeInteractionHint, shouldEmitInteractionHint } from './interaction';
 import { normalizeNavigationTarget, navigationTargetFromRoom } from './navigation';
+import {
+  getRememberedNavigationTargetResult,
+  rememberNavigationTarget,
+} from './navigationContinuity';
 import type {
   ChatActivityItem,
   ChatMessage,
@@ -70,6 +74,11 @@ export const ChatWidget = ({
     () => normalizeNavigationTarget(navigationTarget),
     [navigationTarget],
   );
+  const rememberedNavigationTargetResult = useMemo(
+    () => getRememberedNavigationTargetResult(),
+    [],
+  );
+  const rememberedNavigationTarget = rememberedNavigationTargetResult.target;
   const effectiveAuth = useMemo<ChatWidgetAuth>(
     () =>
       auth ?? {
@@ -94,7 +103,8 @@ export const ChatWidget = ({
   const [initialRequestedRoomId, setInitialRequestedRoomId] = useState<string | null>(
     initialRoomId ?? null,
   );
-  const requestedRoomId = explicitRoomId ?? lookupRoomId ?? initialRequestedRoomId;
+  const requestedRoomId =
+    explicitRoomId ?? lookupRoomId ?? initialRequestedRoomId ?? rememberedNavigationTarget?.roomId ?? null;
   const [rooms, setRooms] = useState<RoomListItem[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(requestedRoomId);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -106,7 +116,7 @@ export const ChatWidget = ({
   const [roomSearchQuery, setRoomSearchQuery] = useState('');
   const [draft, setDraft] = useState('');
   const [localNavigationTarget, setLocalNavigationTarget] =
-    useState<NormalizedChatWidgetNavigationTarget | null>(null);
+    useState<NormalizedChatWidgetNavigationTarget | null>(rememberedNavigationTarget);
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
@@ -119,6 +129,9 @@ export const ChatWidget = ({
   const roomSwitchCountRef = useRef(0);
   const deniedRoomIdRef = useRef<string | null>(null);
   const lastNavigationTargetIdRef = useRef<string | null>(null);
+  const lastRememberedNavigationTargetIdRef = useRef<string | null>(null);
+  const rememberedNavigationTargetStatusRef = useRef(rememberedNavigationTargetResult.status);
+  const hasReportedRememberedNavigationTargetRef = useRef(false);
   const notificationIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedNotificationsRef = useRef(false);
   const lastActiveRoomIdRef = useRef<string | null>(null);
@@ -532,12 +545,61 @@ export const ChatWidget = ({
   }, [callbacks, currentUser.id, realtimeStatus, selectedRoom, selectedRoomId]);
 
   useEffect(() => {
+    if (hasReportedRememberedNavigationTargetRef.current) {
+      return;
+    }
+
+    const status = rememberedNavigationTargetStatusRef.current;
+
+    if (status === 'empty') {
+      return;
+    }
+
+    hasReportedRememberedNavigationTargetRef.current = true;
+    callbacks?.onRealtimeDiagnostic?.({
+      kind:
+        status === 'restored'
+          ? 'navigation_target_restored'
+          : status === 'skipped'
+            ? 'navigation_target_restore_skipped'
+            : 'navigation_target_restore_failed',
+      status: realtimeStatus,
+      timestamp: new Date().toISOString(),
+      selectedRoomId,
+      roomCount: rooms.length,
+      unreadCount:
+        rooms.reduce((total, room) => total + room.unreadCount, 0) +
+        notifications.filter((notification) => notification.readAt === null).length,
+    });
+  }, [callbacks, notifications, realtimeStatus, rooms, selectedRoomId]);
+
+  useEffect(() => {
     const selectedNavigationTarget =
-      selectedRoom !== null ? navigationTargetFromRoom(selectedRoom) : null;
+      selectedRoom !== null
+        ? focusedNavigationTarget?.roomId === selectedRoom.id
+          ? focusedNavigationTarget
+          : navigationTargetFromRoom(selectedRoom)
+        : null;
     const selectedNavigationTargetId = selectedNavigationTarget?.id ?? null;
 
     if (lastSelectedNavigationTargetIdRef.current !== selectedNavigationTargetId) {
       lastSelectedNavigationTargetIdRef.current = selectedNavigationTargetId;
+      if (selectedNavigationTarget !== null) {
+        rememberNavigationTarget(selectedNavigationTarget);
+        if (lastRememberedNavigationTargetIdRef.current !== selectedNavigationTarget.id) {
+          lastRememberedNavigationTargetIdRef.current = selectedNavigationTarget.id;
+          callbacks?.onRealtimeDiagnostic?.({
+            kind: 'navigation_target_remembered',
+            status: realtimeStatus,
+            timestamp: new Date().toISOString(),
+            selectedRoomId,
+            roomCount: rooms.length,
+            unreadCount:
+              rooms.reduce((total, room) => total + room.unreadCount, 0) +
+              notifications.filter((notification) => notification.readAt === null).length,
+          });
+        }
+      }
       callbacks?.onNavigationTargetChange?.(selectedNavigationTarget);
     }
 
@@ -557,7 +619,15 @@ export const ChatWidget = ({
           notifications.filter((notification) => notification.readAt === null).length,
       });
     }
-  }, [callbacks, notifications, realtimeStatus, rooms, selectedRoom, selectedRoomId]);
+  }, [
+    callbacks,
+    focusedNavigationTarget,
+    notifications,
+    realtimeStatus,
+    rooms,
+    selectedRoom,
+    selectedRoomId,
+  ]);
 
   useEffect(() => {
     if (selectedRoom === null || !isTaskRoom(selectedRoom)) {
@@ -602,6 +672,19 @@ export const ChatWidget = ({
       ].slice(0, 5);
     }
   }, [normalizedNavigationTarget, rooms, selectRoom]);
+
+  useEffect(() => {
+    if (rememberedNavigationTarget === null || rememberedNavigationTarget.taskId === undefined) {
+      return;
+    }
+
+    recentTaskRoomIdsRef.current = [
+      ...rooms
+        .filter((room) => room.taskId === rememberedNavigationTarget.taskId)
+        .map((room) => room.id),
+      ...recentTaskRoomIdsRef.current,
+    ].slice(0, 5);
+  }, [rememberedNavigationTarget, rooms]);
 
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent): void => {
@@ -841,6 +924,20 @@ export const ChatWidget = ({
   const handleActivityItemClick = useCallback(
     (item: ChatActivityItem): void => {
       setLocalNavigationTarget(item.target);
+      rememberNavigationTarget(item.target);
+      if (lastRememberedNavigationTargetIdRef.current !== item.target.id) {
+        lastRememberedNavigationTargetIdRef.current = item.target.id;
+        callbacks?.onRealtimeDiagnostic?.({
+          kind: 'navigation_target_remembered',
+          status: realtimeStatus,
+          timestamp: new Date().toISOString(),
+          selectedRoomId: item.target.roomId ?? selectedRoomId,
+          roomCount: rooms.length,
+          unreadCount:
+            rooms.reduce((total, room) => total + room.unreadCount, 0) +
+            notifications.filter((notification) => notification.readAt === null).length,
+        });
+      }
       setRoomSearchQuery('');
 
       if (item.target.roomId !== undefined) {
@@ -854,7 +951,7 @@ export const ChatWidget = ({
         ].slice(0, 5);
       }
     },
-    [rooms, selectRoom],
+    [callbacks, notifications, realtimeStatus, rooms, selectRoom, selectedRoomId],
   );
 
   const shellClassName = ['chat-ui-root', `chat-ui-${mode}`, className].filter(Boolean).join(' ');
