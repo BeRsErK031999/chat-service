@@ -328,6 +328,27 @@ git diff --no-index -- frontend/src/chat-ui ../time-tracker-desktop/src/features
 - Confirm missing identity shows a fail-closed auth state instead of silently opening as an untrusted user.
 - Reopen the overlay and verify last room state and SSE lifecycle recover.
 
+### Activity Continuity Regressions
+
+- Symptom: ActivityPanel is missing, clipped, or only the room list is visible. Likely cause: desktop wrapper CSS/layout
+  hid the shared ActivityPanel. Check embedded panel dimensions and `.chat-ui-activity-panel` visibility. Do not redesign
+  the chat UI or move activity state into the backend to hide a layout issue.
+- Symptom: Needs attention items render but Recent activity cannot be exercised. Likely cause: attention-heavy ordering
+  crowds the visible list. Check derived `ChatActivityItem` sections and scroll behavior. Do not add ranking services or
+  persistence for this client-derived surface.
+- Symptom: after close/reopen, room clicks or Back bounce back to the restored room. Likely cause: remembered continuity
+  target is still acting as persistent `requestedRoomId`. Check that remembered targets initialize selection only and are
+  not treated as parent-controlled navigation after mount. Do not route every internal click through the desktop parent.
+- Symptom: Back or Recent task stops working after notification/activity restore. Likely cause: parent-controlled
+  navigation is overriding internal ChatWidget state. Check `navigationTarget`, `initialRoomId`, and callback ordering.
+  Do not add protocol handlers or renderer identity to force a navigation reset.
+- Symptom: ordinary activity clicks or room switches reconnect SSE. Likely cause: unstable callback/client dependencies
+  or expanded `useChatRealtime` dependencies. Check diagnostics for `activeEventSourceCount`, `cleanup`, and
+  `room_switched`. Do not add WebSocket, NATS, Redis, or polling as a workaround.
+- Symptom: diagnostics or storage contain bearer, `accessToken`, Authorization, secret, message body, notification body,
+  or display name values. Likely cause: unsafe logging or storing raw targets/responses. Check `sessionStorage`, renderer
+  logs, and `onRealtimeDiagnostic` payloads. Do not log tokens, raw SSE URLs, headers, or secret-bearing env.
+
 ### Font Or Asset Warnings
 
 - Do not add unresolved local `@font-face` URLs for fonts that are not vendored.

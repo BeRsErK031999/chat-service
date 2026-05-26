@@ -116,14 +116,20 @@ Desktop renderer smoke:
 
 - Native overlay opens from `time-tracker-desktop`.
 - Rooms render with task grouping, context, unread cues, and notification cues.
+- ActivityPanel renders both Needs attention and Recent activity from existing rooms and notifications.
 - Realtime shows connected and does not fall back during ordinary room switching.
 - Send/retry clears optimistic pending state.
 - Notification routing opens the expected room through the shared navigation target model.
-- Close/reopen restores the last relevant room/task navigation target and reconnects realtime.
+- Close/reopen restores the last relevant room/task/message navigation target and reconnects realtime.
+- Remembered targets are initial-only restore hints. After restore, ordinary room clicks, Back, Recent task, and activity
+  clicks must not be pinned by the restored target.
 - Task/message navigation targets behave predictably: task-only targets preserve context, room targets select rooms, and
   message targets highlight only when the message is loaded.
 - Activity references remain derived from existing notifications and rooms, route through navigation targets, and do not
   create EventSource churn.
+- Malformed `sessionStorage` continuity values skip/failed-restore gracefully without a crash.
+- `sessionStorage` contains no token-like values; only the canonical `chat-nav:v1?...` target string and timestamp are
+  allowed for continuity.
 - Interaction hints remain ephemeral, debounced, stale-expiring, and do not affect notifications, unread counts, or SSE
   lifecycle. `room.typing` and `room.activity` remain documented-only future event shapes; there is no backend fanout,
   persistence, or production typing UI in this foundation slice.
@@ -194,6 +200,8 @@ Healthy long-session signals:
   rooms, messages, and notifications;
 - duplicate events may be reported, but they should not duplicate visible messages, notifications, unread counts, or
   pending sends.
+- activity restore, message highlight restore, task restore, Back, and Recent task all work without EventSource churn;
+- malformed continuity storage reports restore skipped/failed without crash and without sensitive diagnostic fields.
 
 Unhealthy signals:
 
@@ -202,7 +210,11 @@ Unhealthy signals:
 - room switching alone creates reconnect churn;
 - close/reopen loses the last relevant room, unread continuity, or notification routing;
 - notification/task/message target routing diverges between desktop and browser hosts;
+- restored targets pin `requestedRoomId`, so room clicks, Back, or Recent task bounce back to the restored room;
+- parent-controlled navigation keeps overriding internal ChatWidget navigation after the initial restore;
 - activity references require backend inbox/feed state or ranking to work;
+- ActivityPanel is hidden by desktop CSS/layout, or attention items crowd out Recent activity so the activity baseline
+  cannot be verified;
 - typing/activity hints create persistent state, unread counts, notifications, or noisy realtime fanout;
 - diagnostics include tokens, URLs with `accessToken`, Authorization headers, cookies, message bodies, notification
   bodies, secrets, or display names.
@@ -305,3 +317,21 @@ Native desktop diagnostics:
 
 No WebSocket, NATS, Redis, auth redesign, renderer identity fallback, wildcard CORS, TLS bypass, or Electron
 `webSecurity` downgrade was introduced.
+
+## Verified Activity Continuity Baseline - 2026-05-26
+
+Result: production-capable local activity continuity baseline is verified for the desktop runtime.
+
+- ActivityPanel rendered Needs attention and Recent activity in the native Electron overlay.
+- Canonical targets used the `chat-nav:v1?...` envelope and were stored as target string plus timestamp only.
+- Overlay close/reopen restored activity room, task room, and room+message targets.
+- Message highlight restored after reopen when the message was available in the loaded window.
+- Malformed `sessionStorage` skipped restore without crash and emitted sanitized restore failure diagnostics.
+- The restore pinning failure was reproduced and fixed: remembered targets seed initial selection only and no longer
+  behave as a persistent `requestedRoomId`.
+- Back, Recent task, ordinary room clicks, and activity clicks worked after restore without becoming parent-controlled.
+- Runtime invariants during normal restore/reopen: `activeEventSourceCount_max=1`, `leakMarkers_count=0`,
+  `duplicate_event_count=0`, `duplicate_connection_prevented_count=0`, and `reconnect_failed_count=0`.
+- Auth/security invariants remained intact: bearer `/rooms -> 200`, `x-user-id /rooms -> 401`,
+  `/events?userId=... -> 401`, bearer SSE returned `text/event-stream`, renderer env had no chat secret or renderer
+  identity, and storage/diagnostics had no token-like values.

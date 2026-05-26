@@ -145,6 +145,11 @@ Rules:
 - `rememberNavigationTarget`, `getRememberedNavigationTarget`, and `clearRememberedNavigationTarget` provide
   session-local continuity restore. They store only the canonical target string and timestamp in `sessionStorage`, with
   an in-memory fallback when browser storage is unavailable.
+- A remembered target is an initial restore hint only. After mount, normal room clicks, Back, Recent task, notification
+  routing, and activity clicks must stay internally navigable and must not be pinned by the restored room id.
+- Malformed, stale, or non-canonical storage values are skipped without crashing. Diagnostics may report
+  `navigation_target_restore_failed` or `navigation_target_restore_skipped`, but must not include secrets, bearer
+  tokens, access tokens, message bodies, notification bodies, or user display names.
 - `navigationTargetFromNotification` maps backend notifications into the same model; notifications without a room use
   safe host fallback behavior.
 
@@ -185,6 +190,8 @@ Rules:
 - activity targets reuse the same room/message/task continuity semantics as notification routing;
 - ordering is intentionally simple: attention-needed first, then most recent timestamp;
 - `onActivityItemsChange` lets hosts observe the derived list without adding a feed UI.
+- The embedded ActivityPanel renders Needs attention and Recent activity from this derived list. Attention-heavy rooms
+  must not hide the Recent activity section in a way that prevents smoke coverage.
 
 This is not a backend inbox, durable activity stream, notification microservice, analytics/ranking engine, pagination
 model, or heavy UI redesign.
@@ -500,3 +507,25 @@ The live API/SSE smoke passed:
   new bearer SSE stream connected.
 
 No WebSocket, NATS, Redis presence, Kubernetes, or durable fanout layer was needed for this phase.
+
+## Activity Continuity Baseline on 2026-05-26
+
+Live native Electron smoke against the desktop runtime verified the current production-capable activity continuity
+baseline:
+
+- ActivityPanel was visible in the desktop overlay and rendered Needs attention plus Recent activity from loaded rooms
+  and notifications.
+- Activity and notification clicks used normalized canonical targets such as
+  `chat-nav:v1?roomId=...&messageId=...&source=notification`.
+- Overlay close/reopen restored the remembered canonical target through local continuity storage.
+- `messageId` highlight restored after close/reopen when the target message was in the loaded message window.
+- Task discussion restore reopened `task-123/internal` with the task context intact.
+- Malformed `sessionStorage` did not crash the widget and produced a sanitized restore-failed diagnostic.
+- The restore pinning bug was caught and fixed: remembered targets now seed only the initial room request and do not
+  remain as a persistent requested room id.
+- Post-restore Back, Recent task, ordinary room clicks, and activity clicks remained internal ChatWidget navigation, not
+  parent-controlled navigation.
+- Runtime counters stayed healthy during normal restore/reopen: one active EventSource per open widget, no leak markers,
+  no duplicate events, no duplicate-connection prevention, and no reconnect failures.
+- Storage and diagnostics contained no bearer tokens, `accessToken` values, shared secrets, Authorization headers,
+  message bodies, notification bodies, or display names.

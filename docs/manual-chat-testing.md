@@ -194,11 +194,19 @@ Use this checklist after task-centric UX or desktop snapshot changes. Record onl
    available.
 10. Route a notification through `navigationTarget` and confirm the target room opens. Message highlight is best-effort
     when the target message is in the loaded message window.
-11. Send a message and confirm the peer client receives `message.created` and `notification.created`.
-12. Retry the same send path with the same `Idempotency-Key` through the API and confirm one persisted message id.
-13. Mark a room read and confirm `room.read` updates unread state.
-14. Confirm presence indicators render when `presence.changed` events are observed.
-15. If the host wires `onInteractionHintsChange`, switch rooms and confirm local `viewing`/`active_in_room` hints emit
+11. Confirm ActivityPanel renders Needs attention and Recent activity. Click an activity item with a message target and
+    confirm the room opens through a canonical `chat-nav:v1?...` target and highlights the message when loaded.
+12. Close and reopen the host surface and confirm room, task, and room+message continuity restore. After restore,
+    ordinary room clicks, Back, and Recent task must still work and must not be pinned by the remembered target.
+13. If possible, write a malformed continuity value into `sessionStorage`, reopen the widget, and confirm restore fails
+    gracefully without a crash or sensitive diagnostic fields.
+14. Confirm `sessionStorage` contains no token-like values; continuity storage may contain only the canonical target
+    string and timestamp.
+15. Send a message and confirm the peer client receives `message.created` and `notification.created`.
+16. Retry the same send path with the same `Idempotency-Key` through the API and confirm one persisted message id.
+17. Mark a room read and confirm `room.read` updates unread state.
+18. Confirm presence indicators render when `presence.changed` events are observed.
+19. If the host wires `onInteractionHintsChange`, switch rooms and confirm local `viewing`/`active_in_room` hints emit
     with 3 second debounce and 10 second stale semantics, without notifications, unread changes, backend requests, or
     EventSource reconnects.
 
@@ -270,12 +278,16 @@ Expected healthy lifecycle:
 - overlay close emits `cleanup` and reopen creates a fresh connection;
 - reconnect interruption moves through `disconnected`, then `connected`, and does not duplicate messages,
   notifications, unread counts, or pending sends.
+- activity restore, message highlight restore, task restore, Back, and Recent task do not increase
+  `activeEventSourceCount`;
+- malformed continuity storage reports skipped/failed restore without crash.
 
 Unhealthy lifecycle:
 
 - `activeEventSourceCount` grows above `1` for one widget instance;
 - reconnect attempts continue after network recovery;
 - room switching causes EventSource recreation;
+- restored continuity pins room selection so internal clicks, Back, or Recent task bounce back;
 - diagnostics include access tokens, secrets, URLs, headers, bodies, or display names.
 
 Verify SSE headers for the desktop renderer origin:

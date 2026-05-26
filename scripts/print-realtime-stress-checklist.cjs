@@ -18,17 +18,20 @@ const sections = [
   {
     title: 'Activity inbox stress',
     items: [
+      'Confirm ActivityPanel renders both Needs attention and Recent activity; attention-heavy data must not hide Recent activity from the smoke path.',
       'Click Needs attention and Recent activity items repeatedly, including entries with messageId and taskId targets.',
-      'Expected: selected room and message highlight follow the normalized target, Back returns to the previous discussion, and ChatWidget stays mounted.',
-      'Unhealthy: activity clicks recreate the EventSource, clear selected room continuity unexpectedly, or emit token/accessToken values in diagnostics.',
+      'Expected: selected room and message highlight follow the normalized/canonical target, Back returns to the previous discussion, and ChatWidget stays mounted.',
+      'Expected: after restore, remembered targets do not pin requestedRoomId; ordinary room clicks, Back, Recent task, and activity clicks still work.',
+      'Unhealthy: activity clicks recreate the EventSource, clear selected room continuity unexpectedly, pin navigation to a restored room, or emit token/accessToken values in diagnostics.',
     ],
   },
   {
     title: 'Overlay lifecycle stress',
     items: [
       'Close and reopen the desktop overlay at least 10 times.',
-      'Expected: cleanup count increases on close, a new connect_start/connected pair appears on reopen, and activeEventSourceCount returns to 1.',
-      'Unhealthy: activeEventSourceCount grows above 1 for one widget, unread count doubles, or the last selected room is lost.',
+      'Expected: cleanup count increases on close, a new connect_start/connected pair appears on reopen, activeEventSourceCount returns to 1, and canonical room/task/message continuity restores.',
+      'Expected: messageId highlight restores when the message is loaded, and malformed sessionStorage values fail/skip restore without crash.',
+      'Unhealthy: activeEventSourceCount grows above 1 for one widget, unread count doubles, last selected room is lost, or restored target pins later navigation.',
     ],
   },
   {
@@ -52,6 +55,8 @@ const sections = [
     items: [
       'Allowed fields: kind, status, timestamp, eventName, selectedRoomId, lifecycle counters, timestamps, roomCount, and unreadCount.',
       'Do not log bearer tokens, accessToken query strings, Authorization headers, cookies, secrets, SSE URLs, message bodies, notification bodies, or display names.',
+      'Confirm sessionStorage contains no token-like values; continuity storage may contain only the canonical chat-nav:v1 target and timestamp.',
+      'Expected counters during normal restore/reopen: activeEventSourceCount_max=1, leakMarkers=0, duplicate_event_count=0, duplicate_connection_prevented_count=0, reconnect_failed_count=0.',
       'Record only pass/fail, counts, timestamps, and known limitations in docs evidence.',
     ],
   },
