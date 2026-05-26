@@ -120,6 +120,21 @@ export type ChatActivityItem = {
   priority?: Notification['priority'];
 };
 
+export type ChatInteractionKind = 'typing' | 'viewing' | 'active_in_room';
+
+export type ChatInteractionHint = {
+  id: string;
+  kind: ChatInteractionKind;
+  roomId: string;
+  userId: string;
+  occurredAt: string;
+  expiresAt: string;
+  debounceMs: number;
+  staleAfterMs: number;
+  taskId?: string;
+  messageId?: string;
+};
+
 export type RealtimeStatus = 'disabled' | 'connecting' | 'disconnected' | 'connected';
 
 export type ChatRealtimeDiagnosticKind =
@@ -176,6 +191,7 @@ export type ChatWidgetCallbacks = {
   onRoomChange?: (roomId: string | null) => void;
   onNavigationTargetChange?: (target: NormalizedChatWidgetNavigationTarget | null) => void;
   onActivityItemsChange?: (items: ChatActivityItem[]) => void;
+  onInteractionHintsChange?: (hints: ChatInteractionHint[]) => void;
   onMessageSent?: (message: Message) => void;
   onTaskOpen?: (taskId: string) => void;
   onTaskReferenceCopy?: (taskReference: string) => void;

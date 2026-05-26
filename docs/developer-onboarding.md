@@ -19,6 +19,8 @@ notification, storing the last normalized navigation target, and passing the res
 Reusable `chat-ui` must not know about Electron windows, tray behavior, protocol handlers, or browser history.
 Future desktop inbox/feed surfaces should consume shared `ChatActivityItem` targets and keep Electron window behavior in
 the adapter layer.
+Future typing indicators should consume `ChatInteractionHint` semantics and must keep debounce, stale expiry, and
+non-persistence guarantees intact.
 
 Rocket.Chat is not the core chat runtime. It remains historical prototype context only. Do not add new Rocket.Chat,
 WebSocket, NATS, Redis, Kubernetes, or microservice-split work as part of ordinary chat changes.
@@ -32,7 +34,8 @@ The reusable `ChatWidget` source of truth lives in `chat-service/frontend/src/ch
 - the SSE lifecycle through `useChatRealtime`;
 - task-centric chat context and workflow actions that can be consumed by multiple hosts;
 - lightweight navigation target helpers for room, message, task, notification, and future activity/inbox entry points;
-- derived activity item helpers for recent rooms, unread rooms, notifications, and attention-needed references.
+- derived activity item helpers for recent rooms, unread rooms, notifications, and attention-needed references;
+- ephemeral interaction hint helpers for future typing, viewing, and active-in-room affordances.
 
 The desktop repo consumes a snapshot/subtree at `time-tracker-desktop/src/features/chat/chat-ui`. Desktop must not make
 product or host-specific changes inside that subtree. Shared UI changes start in `chat-service`, then flow into desktop

@@ -124,6 +124,8 @@ Desktop renderer smoke:
   message targets highlight only when the message is loaded.
 - Activity references remain derived from existing notifications and rooms, route through navigation targets, and do not
   create EventSource churn.
+- Interaction hints remain ephemeral, debounced, stale-expiring, and do not affect notifications, unread counts, or SSE
+  lifecycle.
 
 CORS and Private Network Access smoke from the desktop dev origin:
 
@@ -200,6 +202,7 @@ Unhealthy signals:
 - close/reopen loses the last relevant room, unread continuity, or notification routing;
 - notification/task/message target routing diverges between desktop and browser hosts;
 - activity references require backend inbox/feed state or ranking to work;
+- typing/activity hints create persistent state, unread counts, notifications, or noisy realtime fanout;
 - diagnostics include tokens, URLs with `accessToken`, Authorization headers, cookies, message bodies, notification
   bodies, secrets, or display names.
 

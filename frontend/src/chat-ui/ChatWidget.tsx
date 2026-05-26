@@ -19,10 +19,12 @@ import {
 } from './components';
 import { useChatClient } from './hooks/useChatClient';
 import { useChatRealtime } from './hooks/useChatRealtime';
+import { normalizeInteractionHint, shouldEmitInteractionHint } from './interaction';
 import { normalizeNavigationTarget, navigationTargetFromRoom } from './navigation';
 import type {
   ChatMessage,
   ChatWidgetAuth,
+  ChatInteractionHint,
   ChatWidgetProps,
   LocalMessage,
   Message,
@@ -106,6 +108,7 @@ export const ChatWidget = ({
   const lastUnreadCountRef = useRef<number | null>(null);
   const lastRoomChangeRef = useRef<string | null | undefined>(undefined);
   const lastSelectedNavigationTargetIdRef = useRef<string | null | undefined>(undefined);
+  const lastInteractionHintRef = useRef<ChatInteractionHint | null>(null);
   const roomSwitchCountRef = useRef(0);
   const deniedRoomIdRef = useRef<string | null>(null);
   const lastNavigationTargetIdRef = useRef<string | null>(null);
@@ -483,6 +486,30 @@ export const ChatWidget = ({
   useEffect(() => {
     callbacks?.onActivityItemsChange?.(activityItems);
   }, [activityItems, callbacks]);
+
+  useEffect(() => {
+    if (selectedRoomId === null) {
+      lastInteractionHintRef.current = null;
+      callbacks?.onInteractionHintsChange?.([]);
+      return;
+    }
+
+    const hint = normalizeInteractionHint({
+      kind: realtimeStatus === 'connected' ? 'active_in_room' : 'viewing',
+      roomId: selectedRoomId,
+      userId: currentUser.id,
+      ...(selectedRoom?.taskId !== null && selectedRoom?.taskId !== undefined
+        ? { taskId: selectedRoom.taskId }
+        : {}),
+    });
+
+    if (hint === null || !shouldEmitInteractionHint(lastInteractionHintRef.current, hint)) {
+      return;
+    }
+
+    lastInteractionHintRef.current = hint;
+    callbacks?.onInteractionHintsChange?.([hint]);
+  }, [callbacks, currentUser.id, realtimeStatus, selectedRoom, selectedRoomId]);
 
   useEffect(() => {
     const selectedNavigationTarget =

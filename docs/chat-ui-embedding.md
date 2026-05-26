@@ -181,6 +181,41 @@ Rules:
 This is not a backend inbox, durable activity stream, notification microservice, analytics/ranking engine, pagination
 model, or heavy UI redesign.
 
+## Interaction Hint Foundation
+
+`chat-ui` exposes a minimal interaction hint model for future typing indicators and richer activity hints. The current
+foundation is local/shared only; it does not send typing events to the backend and does not render a production typing
+UI.
+
+```ts
+type ChatInteractionHint = {
+  id: string;
+  kind: 'typing' | 'viewing' | 'active_in_room';
+  roomId: string;
+  userId: string;
+  occurredAt: string;
+  expiresAt: string;
+  debounceMs: number;
+  staleAfterMs: number;
+  taskId?: string;
+  messageId?: string;
+};
+```
+
+Rules:
+
+- hints are ephemeral and never persisted;
+- hints do not create notifications, unread counts, read states, or activity items by themselves;
+- default debounce is 3 seconds and default stale timeout is 10 seconds;
+- `normalizeInteractionHint` drops hints without room/user identity;
+- `pruneStaleInteractionHints` removes expired hints for future host-side display;
+- `shouldEmitInteractionHint` prevents noisy repeated updates inside the debounce window;
+- `ChatWidget` can emit local `viewing` or `active_in_room` hints through `onInteractionHintsChange` without changing
+  the SSE connection lifecycle.
+
+Future backend integration, if needed, should use an ephemeral SSE shape such as `room.activity` or `room.typing` with
+room membership fanout, explicit throttling, stale expiry, no persistence, no notifications, and no unread impact.
+
 ## Desktop Example
 
 ```tsx
@@ -359,6 +394,8 @@ Current task-centric UI behavior:
   precedence for explicit routing.
 - Hosts can prepare future inbox/feed surfaces by observing `onActivityItemsChange`; these items are derived from
   existing notifications and rooms and should route through their embedded navigation targets.
+- Hosts can prepare future typing/activity affordances by observing `onInteractionHintsChange`; these hints are
+  ephemeral and should be debounced and expired before display.
 - Task rooms get a task discussion label and stronger unread badge styling.
 - Room rows show existing room type/scope metadata when available.
 - Room rows now surface lightweight workflow awareness from existing room data: unread rooms are marked as needing
@@ -386,6 +423,7 @@ The reusable layer owns:
 - host-facing public types
 - platform-neutral navigation target helpers for normalize, parse, serialize, room, and notification targets
 - platform-neutral activity helpers for notification, unread-room, recent-room, and attention-needed references
+- platform-neutral interaction hint helpers for typing, viewing, active-in-room, debounce, and stale expiry semantics
 - API client creation from `apiBaseUrl` and `auth`
 - SSE realtime hook with connecting/connected/disconnected state callback
 - stable `EventSource` lifecycle across room switching through refs for selected room and refresh handlers
@@ -402,6 +440,7 @@ The reusable layer owns:
   return, recent task room recall, local mark-unread emphasis, and platform-neutral task action callbacks
 - platform-neutral target semantics for future activity feed, inbox, and attention-needed surfaces
 - derived activity item callbacks without owning feed rendering or pagination
+- local interaction hint callbacks without backend fanout or production typing UI
 
 The playground layer owns:
 
@@ -428,6 +467,7 @@ tokens and never receives `CHAT_INTERNAL_AUTH_SECRET`.
 - Navigation targets do not add browser history, Electron protocol handlers, backend lookup redesign, or a full router.
 - Activity items are derived client-side from currently loaded rooms and notifications; they are not a durable inbox or
   ranked activity feed.
+- Interaction hints are local/shared foundation only; no backend typing fanout is enabled yet.
 - Browser automation smoke may be unavailable in some local Codex sessions; do not record browser playground success
   unless the browser tooling actually ran.
 

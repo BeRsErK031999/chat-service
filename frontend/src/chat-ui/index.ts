@@ -5,6 +5,14 @@ export {
   buildChatActivityItems,
 } from './activity';
 export {
+  DEFAULT_INTERACTION_HINT_DEBOUNCE_MS,
+  DEFAULT_INTERACTION_HINT_STALE_MS,
+  createInteractionHintId,
+  normalizeInteractionHint,
+  pruneStaleInteractionHints,
+  shouldEmitInteractionHint,
+} from './interaction';
+export {
   navigationTargetFromNotification,
   navigationTargetFromRoom,
   normalizeNavigationTarget,
@@ -15,9 +23,14 @@ export type {
   BuildChatActivityItemsInput,
 } from './activity';
 export type {
+  ChatInteractionHintInput,
+} from './interaction';
+export type {
   ChatActivityAttentionState,
   ChatActivityItem,
   ChatActivityKind,
+  ChatInteractionHint,
+  ChatInteractionKind,
   ChatUser,
   ChatWidgetAuth,
   ChatWidgetCallbacks,
