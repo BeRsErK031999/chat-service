@@ -122,6 +122,8 @@ Desktop renderer smoke:
 - Close/reopen restores the last relevant room/task navigation target and reconnects realtime.
 - Task/message navigation targets behave predictably: task-only targets preserve context, room targets select rooms, and
   message targets highlight only when the message is loaded.
+- Activity references remain derived from existing notifications and rooms, route through navigation targets, and do not
+  create EventSource churn.
 
 CORS and Private Network Access smoke from the desktop dev origin:
 
@@ -197,6 +199,7 @@ Unhealthy signals:
 - room switching alone creates reconnect churn;
 - close/reopen loses the last relevant room, unread continuity, or notification routing;
 - notification/task/message target routing diverges between desktop and browser hosts;
+- activity references require backend inbox/feed state or ranking to work;
 - diagnostics include tokens, URLs with `accessToken`, Authorization headers, cookies, message bodies, notification
   bodies, secrets, or display names.
 

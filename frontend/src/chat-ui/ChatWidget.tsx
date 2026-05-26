@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactElement } from 'react';
 
 import { ChatApiError } from './api';
+import { buildChatActivityItems } from './activity';
 import './chat-widget.css';
 import {
   MessageComposer,
@@ -172,6 +173,11 @@ export const ChatWidget = ({
       }),
     );
   }, [rooms]);
+
+  const activityItems = useMemo(
+    () => buildChatActivityItems({ rooms, notifications }),
+    [notifications, rooms],
+  );
 
   const visibleMessages = useMemo<ChatMessage[]>(
     () =>
@@ -473,6 +479,10 @@ export const ChatWidget = ({
     lastUnreadCountRef.current = nextUnreadCount;
     callbacks?.onUnreadCountChange?.(nextUnreadCount);
   }, [callbacks, notifications, rooms]);
+
+  useEffect(() => {
+    callbacks?.onActivityItemsChange?.(activityItems);
+  }, [activityItems, callbacks]);
 
   useEffect(() => {
     const selectedNavigationTarget =

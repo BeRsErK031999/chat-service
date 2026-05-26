@@ -143,6 +143,44 @@ Rules:
 This intentionally does not add browser history redesign, Electron protocol handlers, backend deep-link APIs, or an
 activity feed.
 
+## Activity Target Foundation
+
+`chat-ui` also exposes lightweight activity helpers that derive activity items from data the widget already loads:
+
+- notifications from `/notifications`;
+- unread room counts and room metadata from `/rooms`;
+- `lastMessageAt` and latest message preview from room list items;
+- navigation targets from the shared target model.
+
+`ChatActivityItem` is a platform-neutral reference for future inbox, activity feed, and attention-needed surfaces:
+
+```ts
+type ChatActivityItem = {
+  id: string;
+  kind: 'notification' | 'unread-room' | 'recent-room';
+  attentionState: 'attention-needed' | 'recent' | 'read';
+  target: NormalizedChatWidgetNavigationTarget;
+  roomId?: string;
+  messageId?: string;
+  taskId?: string;
+  title: string;
+  summary?: string;
+  occurredAt: string;
+};
+```
+
+Rules:
+
+- unread notifications and unread rooms become `attention-needed`;
+- read notifications remain addressable as `read` activity;
+- rooms with recent messages become `recent-room` activity;
+- activity targets reuse the same room/message/task continuity semantics as notification routing;
+- ordering is intentionally simple: attention-needed first, then most recent timestamp;
+- `onActivityItemsChange` lets hosts observe the derived list without adding a feed UI.
+
+This is not a backend inbox, durable activity stream, notification microservice, analytics/ranking engine, pagination
+model, or heavy UI redesign.
+
 ## Desktop Example
 
 ```tsx
@@ -319,6 +357,8 @@ Current task-centric UI behavior:
 - Hosts can preserve task/discussion context after shell reopen by storing the last observed
   `onNavigationTargetChange` value and passing its room back as `initialRoomId`. `context.roomId` still takes
   precedence for explicit routing.
+- Hosts can prepare future inbox/feed surfaces by observing `onActivityItemsChange`; these items are derived from
+  existing notifications and rooms and should route through their embedded navigation targets.
 - Task rooms get a task discussion label and stronger unread badge styling.
 - Room rows show existing room type/scope metadata when available.
 - Room rows now surface lightweight workflow awareness from existing room data: unread rooms are marked as needing
@@ -345,6 +385,7 @@ The reusable layer owns:
 - `ChatWidget`
 - host-facing public types
 - platform-neutral navigation target helpers for normalize, parse, serialize, room, and notification targets
+- platform-neutral activity helpers for notification, unread-room, recent-room, and attention-needed references
 - API client creation from `apiBaseUrl` and `auth`
 - SSE realtime hook with connecting/connected/disconnected state callback
 - stable `EventSource` lifecycle across room switching through refs for selected room and refresh handlers
@@ -360,6 +401,7 @@ The reusable layer owns:
 - command-like navigation/action behavior, including unread traversal, active discussion cycling, previous discussion
   return, recent task room recall, local mark-unread emphasis, and platform-neutral task action callbacks
 - platform-neutral target semantics for future activity feed, inbox, and attention-needed surfaces
+- derived activity item callbacks without owning feed rendering or pagination
 
 The playground layer owns:
 
@@ -384,6 +426,8 @@ tokens and never receives `CHAT_INTERNAL_AUTH_SECRET`.
 - Message highlighting through `navigationTarget.messageId` is best-effort for messages present in the loaded message
   window.
 - Navigation targets do not add browser history, Electron protocol handlers, backend lookup redesign, or a full router.
+- Activity items are derived client-side from currently loaded rooms and notifications; they are not a durable inbox or
+  ranked activity feed.
 - Browser automation smoke may be unavailable in some local Codex sessions; do not record browser playground success
   unless the browser tooling actually ran.
 

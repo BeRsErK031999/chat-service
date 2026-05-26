@@ -1,5 +1,10 @@
 export { ChatWidget } from './ChatWidget';
 export {
+  activityItemFromNotification,
+  activityItemFromRoom,
+  buildChatActivityItems,
+} from './activity';
+export {
   navigationTargetFromNotification,
   navigationTargetFromRoom,
   normalizeNavigationTarget,
@@ -7,6 +12,12 @@ export {
   serializeNavigationTarget,
 } from './navigation';
 export type {
+  BuildChatActivityItemsInput,
+} from './activity';
+export type {
+  ChatActivityAttentionState,
+  ChatActivityItem,
+  ChatActivityKind,
   ChatUser,
   ChatWidgetAuth,
   ChatWidgetCallbacks,

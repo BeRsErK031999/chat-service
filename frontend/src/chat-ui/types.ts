@@ -101,6 +101,25 @@ export type NormalizedChatWidgetNavigationTarget = {
   source?: ChatWidgetNavigationSource;
 };
 
+export type ChatActivityKind = 'notification' | 'unread-room' | 'recent-room';
+
+export type ChatActivityAttentionState = 'attention-needed' | 'recent' | 'read';
+
+export type ChatActivityItem = {
+  id: string;
+  kind: ChatActivityKind;
+  attentionState: ChatActivityAttentionState;
+  target: NormalizedChatWidgetNavigationTarget;
+  roomId?: string;
+  messageId?: string;
+  taskId?: string;
+  title: string;
+  summary?: string;
+  occurredAt: string;
+  unreadCount?: number;
+  priority?: Notification['priority'];
+};
+
 export type RealtimeStatus = 'disabled' | 'connecting' | 'disconnected' | 'connected';
 
 export type ChatRealtimeDiagnosticKind =
@@ -156,6 +175,7 @@ export type ChatWidgetCallbacks = {
   onUnreadCountChange?: (count: number) => void;
   onRoomChange?: (roomId: string | null) => void;
   onNavigationTargetChange?: (target: NormalizedChatWidgetNavigationTarget | null) => void;
+  onActivityItemsChange?: (items: ChatActivityItem[]) => void;
   onMessageSent?: (message: Message) => void;
   onTaskOpen?: (taskId: string) => void;
   onTaskReferenceCopy?: (taskReference: string) => void;
