@@ -79,7 +79,7 @@ export const ChatWidget = ({
     [auth, currentUser.id],
   );
   const client = useChatClient(apiBaseUrl, effectiveAuth);
-  const explicitRoomId = context?.roomId ?? normalizedNavigationTarget?.roomId ?? initialRoomId ?? null;
+  const explicitRoomId = context?.roomId ?? normalizedNavigationTarget?.roomId ?? null;
   const taskRoomLookupContext = useMemo(
     () =>
       explicitRoomId === null && context?.taskId !== undefined && context.roomScope !== undefined
@@ -91,7 +91,10 @@ export const ChatWidget = ({
     [context?.roomScope, context?.taskId, explicitRoomId],
   );
   const [lookupRoomId, setLookupRoomId] = useState<string | null>(null);
-  const requestedRoomId = explicitRoomId ?? lookupRoomId;
+  const [initialRequestedRoomId, setInitialRequestedRoomId] = useState<string | null>(
+    initialRoomId ?? null,
+  );
+  const requestedRoomId = explicitRoomId ?? lookupRoomId ?? initialRequestedRoomId;
   const [rooms, setRooms] = useState<RoomListItem[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(requestedRoomId);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -353,6 +356,9 @@ export const ChatWidget = ({
       if (requestedRoomId !== null) {
         deniedRoomIdRef.current = null;
         selectRoom(requestedRoomId, { preserveLastActive: true });
+        if (explicitRoomId === null && lookupRoomId === null) {
+          setInitialRequestedRoomId(null);
+        }
         return;
       }
 
@@ -373,7 +379,16 @@ export const ChatWidget = ({
     } finally {
       setIsLoadingRooms(false);
     }
-  }, [callbacks, client, reportError, requestedRoomId, selectRoom, taskRoomLookupContext]);
+  }, [
+    callbacks,
+    client,
+    explicitRoomId,
+    lookupRoomId,
+    reportError,
+    requestedRoomId,
+    selectRoom,
+    taskRoomLookupContext,
+  ]);
 
   const loadMessages = useCallback(async () => {
     if (selectedRoomId === null) {
@@ -827,7 +842,6 @@ export const ChatWidget = ({
     (item: ChatActivityItem): void => {
       setLocalNavigationTarget(item.target);
       setRoomSearchQuery('');
-      callbacks?.onNavigationTargetChange?.(item.target);
 
       if (item.target.roomId !== undefined) {
         selectRoom(item.target.roomId);
@@ -839,16 +853,8 @@ export const ChatWidget = ({
           ...recentTaskRoomIdsRef.current,
         ].slice(0, 5);
       }
-
-      if (item.notificationId !== undefined) {
-        const notification = notifications.find((candidate) => candidate.id === item.notificationId);
-
-        if (notification !== undefined) {
-          callbacks?.onNotificationClick?.(notification);
-        }
-      }
     },
-    [callbacks, notifications, rooms, selectRoom],
+    [rooms, selectRoom],
   );
 
   const shellClassName = ['chat-ui-root', `chat-ui-${mode}`, className].filter(Boolean).join(' ');

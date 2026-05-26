@@ -73,7 +73,7 @@ export const ActivityPanel = ({
   const sections = splitChatActivityItems(items);
 
   return (
-    <aside className="chat-ui-notifications chat-ui-activity-panel">
+    <aside className="chat-ui-activity-panel">
       <div className="chat-ui-panel-header">
         <div>
           <p className="chat-ui-eyebrow">Activity</p>

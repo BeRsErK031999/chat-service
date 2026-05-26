@@ -18,6 +18,8 @@ export type ChatActivitySections = {
   recentActivity: ChatActivityItem[];
 };
 
+const RECENT_ACTIVITY_RESERVE = 4;
+
 const getTimeValue = (timestamp: string | null): number => {
   if (timestamp === null) {
     return 0;
@@ -109,19 +111,37 @@ export const buildChatActivityItems = ({
       .map(activityItemFromRoom),
   ];
 
-  return items
-    .sort((left, right) => {
-      const attentionDelta =
-        Number(right.attentionState === 'attention-needed') -
-        Number(left.attentionState === 'attention-needed');
+  const sortedItems = items.sort((left, right) => {
+    const attentionDelta =
+      Number(right.attentionState === 'attention-needed') -
+      Number(left.attentionState === 'attention-needed');
 
-      if (attentionDelta !== 0) {
-        return attentionDelta;
-      }
+    if (attentionDelta !== 0) {
+      return attentionDelta;
+    }
 
-      return getTimeValue(right.occurredAt) - getTimeValue(left.occurredAt);
-    })
-    .slice(0, Math.max(0, limit));
+    return getTimeValue(right.occurredAt) - getTimeValue(left.occurredAt);
+  });
+  const normalizedLimit = Math.max(0, limit);
+
+  if (sortedItems.length <= normalizedLimit) {
+    return sortedItems;
+  }
+
+  const attentionItems = sortedItems.filter((item) => item.attentionState === 'attention-needed');
+  const recentItems = sortedItems.filter((item) => item.attentionState !== 'attention-needed');
+
+  if (attentionItems.length === 0 || recentItems.length === 0 || normalizedLimit < 2) {
+    return sortedItems.slice(0, normalizedLimit);
+  }
+
+  const recentLimit = Math.min(
+    recentItems.length,
+    Math.max(1, Math.min(RECENT_ACTIVITY_RESERVE, Math.floor(normalizedLimit / 4))),
+  );
+  const attentionLimit = normalizedLimit - recentLimit;
+
+  return [...attentionItems.slice(0, attentionLimit), ...recentItems.slice(0, recentLimit)];
 };
 
 export const splitChatActivityItems = (

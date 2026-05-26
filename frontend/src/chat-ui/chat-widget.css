@@ -48,18 +48,21 @@
   grid-template-columns: minmax(220px, 280px) minmax(320px, 1fr);
 }
 
-.chat-ui-compact .chat-ui-notifications {
+.chat-ui-compact .chat-ui-notifications,
+.chat-ui-compact .chat-ui-activity-panel {
   display: none;
 }
 
 .chat-ui-sidebar,
-.chat-ui-notifications {
+.chat-ui-notifications,
+.chat-ui-activity-panel {
   min-width: 0;
   border-right: 1px solid #cdd6dd;
   background: #f8fafb;
 }
 
-.chat-ui-notifications {
+.chat-ui-notifications,
+.chat-ui-activity-panel {
   border-right: 0;
   border-left: 1px solid #cdd6dd;
 }
@@ -470,7 +473,8 @@
     grid-template-columns: 260px minmax(360px, 1fr);
   }
 
-  .chat-ui-notifications {
+  .chat-ui-notifications,
+  .chat-ui-activity-panel {
     display: none;
   }
 }

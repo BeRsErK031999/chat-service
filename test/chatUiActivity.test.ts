@@ -132,4 +132,31 @@ describe('chat UI activity items', () => {
       recentActivity: [expect.objectContaining({ id: 'notification:notification-2' })],
     });
   });
+
+  it('keeps recent activity visible when attention entries exceed the activity limit', () => {
+    const notifications = Array.from({ length: 20 }, (_, index) => ({
+      ...notification,
+      id: `notification-${index}`,
+      createdAt: `2026-05-26T11:${String(index).padStart(2, '0')}:00.000Z`,
+      updatedAt: `2026-05-26T11:${String(index).padStart(2, '0')}:00.000Z`,
+    }));
+    const recentRoom = {
+      ...room,
+      id: 'room-2',
+      taskId: null,
+      unreadCount: 0,
+      lastMessageAt: '2026-05-26T13:00:00.000Z',
+    };
+
+    const sections = splitChatActivityItems(
+      buildChatActivityItems({
+        rooms: [recentRoom],
+        notifications,
+        limit: 6,
+      }),
+    );
+
+    expect(sections.needsAttention).toHaveLength(5);
+    expect(sections.recentActivity).toEqual([expect.objectContaining({ id: 'room:room-2' })]);
+  });
 });
