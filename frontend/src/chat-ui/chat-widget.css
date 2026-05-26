@@ -133,7 +133,8 @@
 }
 
 .chat-ui-room-list,
-.chat-ui-notification-list {
+.chat-ui-notification-list,
+.chat-ui-activity-list {
   display: grid;
   gap: 8px;
   padding: 12px;
@@ -387,6 +388,60 @@
 
 .chat-ui-notification button {
   justify-self: start;
+}
+
+.chat-ui-activity-list {
+  align-content: start;
+}
+
+.chat-ui-activity-section {
+  display: grid;
+  gap: 8px;
+}
+
+.chat-ui-activity-item {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  border: 1px solid #d7dfe6;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.chat-ui-activity-unread {
+  border-color: #d6a43f;
+  background: #fff8e9;
+}
+
+.chat-ui-activity-open {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.chat-ui-activity-open strong,
+.chat-ui-activity-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-ui-activity-summary,
+.chat-ui-activity-open time {
+  color: #637083;
+  font-size: 12px;
+}
+
+.chat-ui-activity-item > button:not(.chat-ui-activity-open) {
+  justify-self: start;
+  margin: 0 0 12px 12px;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 6px;
 }
 
 .chat-ui-message button {

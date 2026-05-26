@@ -13,6 +13,11 @@ export type BuildChatActivityItemsInput = {
   limit?: number;
 };
 
+export type ChatActivitySections = {
+  needsAttention: ChatActivityItem[];
+  recentActivity: ChatActivityItem[];
+};
+
 const getTimeValue = (timestamp: string | null): number => {
   if (timestamp === null) {
     return 0;
@@ -77,6 +82,7 @@ export const activityItemFromNotification = (
     kind: 'notification',
     attentionState: notification.readAt === null ? 'attention-needed' : 'read',
     target,
+    notificationId: notification.id,
     ...(notification.roomId !== null ? { roomId: notification.roomId } : {}),
     ...(notification.messageId !== null ? { messageId: notification.messageId } : {}),
     title: notification.title,
@@ -117,3 +123,10 @@ export const buildChatActivityItems = ({
     })
     .slice(0, Math.max(0, limit));
 };
+
+export const splitChatActivityItems = (
+  items: readonly ChatActivityItem[],
+): ChatActivitySections => ({
+  needsAttention: items.filter((item) => item.attentionState === 'attention-needed'),
+  recentActivity: items.filter((item) => item.attentionState !== 'attention-needed'),
+});

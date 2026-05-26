@@ -1,3 +1,4 @@
+export { ActivityPanel } from './ActivityPanel';
 export { MessageComposer } from './MessageComposer';
 export { MessageList } from './MessageList';
 export { NotificationsPanel } from './NotificationsPanel';

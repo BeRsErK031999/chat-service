@@ -110,6 +110,7 @@ export type ChatActivityItem = {
   kind: ChatActivityKind;
   attentionState: ChatActivityAttentionState;
   target: NormalizedChatWidgetNavigationTarget;
+  notificationId?: string;
   roomId?: string;
   messageId?: string;
   taskId?: string;

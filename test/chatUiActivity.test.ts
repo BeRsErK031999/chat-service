@@ -4,6 +4,7 @@ import {
   activityItemFromNotification,
   activityItemFromRoom,
   buildChatActivityItems,
+  splitChatActivityItems,
 } from '../frontend/src/chat-ui/activity.js';
 import type { Message, Notification, RoomListItem } from '../frontend/src/chat-ui/types.js';
 
@@ -82,6 +83,7 @@ describe('chat UI activity items', () => {
         messageId: 'message-1',
         source: 'notification',
       },
+      notificationId: 'notification-1',
       roomId: 'room-1',
       messageId: 'message-1',
       title: 'New reply',
@@ -112,5 +114,22 @@ describe('chat UI activity items', () => {
         notifications: [readNotification],
       }).map((item) => item.id),
     ).toEqual(['room:room-1', 'room:room-2', 'notification:notification-2']);
+  });
+
+  it('splits activity into attention and recent UI sections', () => {
+    const readNotification = {
+      ...notification,
+      id: 'notification-2',
+      readAt: '2026-05-26T11:30:00.000Z',
+    };
+    const items = buildChatActivityItems({
+      rooms: [room],
+      notifications: [readNotification],
+    });
+
+    expect(splitChatActivityItems(items)).toEqual({
+      needsAttention: [expect.objectContaining({ id: 'room:room-1' })],
+      recentActivity: [expect.objectContaining({ id: 'notification:notification-2' })],
+    });
   });
 });

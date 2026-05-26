@@ -3,6 +3,7 @@ export {
   activityItemFromNotification,
   activityItemFromRoom,
   buildChatActivityItems,
+  splitChatActivityItems,
 } from './activity';
 export {
   DEFAULT_INTERACTION_HINT_DEBOUNCE_MS,
@@ -21,6 +22,7 @@ export {
 } from './navigation';
 export type {
   BuildChatActivityItemsInput,
+  ChatActivitySections,
 } from './activity';
 export type {
   ChatInteractionHintInput,

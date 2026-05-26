@@ -5,9 +5,9 @@ import { ChatApiError } from './api';
 import { buildChatActivityItems } from './activity';
 import './chat-widget.css';
 import {
+  ActivityPanel,
   MessageComposer,
   MessageList,
-  NotificationsPanel,
   RealtimeStatus,
   RoomList,
   formatRelativeActivity,
@@ -22,12 +22,14 @@ import { useChatRealtime } from './hooks/useChatRealtime';
 import { normalizeInteractionHint, shouldEmitInteractionHint } from './interaction';
 import { normalizeNavigationTarget, navigationTargetFromRoom } from './navigation';
 import type {
+  ChatActivityItem,
   ChatMessage,
   ChatWidgetAuth,
   ChatInteractionHint,
   ChatWidgetProps,
   LocalMessage,
   Message,
+  NormalizedChatWidgetNavigationTarget,
   Notification,
   PresenceState,
   RoomListItem,
@@ -100,6 +102,8 @@ export const ChatWidget = ({
   );
   const [roomSearchQuery, setRoomSearchQuery] = useState('');
   const [draft, setDraft] = useState('');
+  const [localNavigationTarget, setLocalNavigationTarget] =
+    useState<NormalizedChatWidgetNavigationTarget | null>(null);
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
@@ -181,6 +185,7 @@ export const ChatWidget = ({
     () => buildChatActivityItems({ rooms, notifications }),
     [notifications, rooms],
   );
+  const focusedNavigationTarget = normalizedNavigationTarget ?? localNavigationTarget;
 
   const visibleMessages = useMemo<ChatMessage[]>(
     () =>
@@ -567,6 +572,7 @@ export const ChatWidget = ({
     }
 
     lastNavigationTargetIdRef.current = normalizedNavigationTarget.id;
+    setLocalNavigationTarget(normalizedNavigationTarget);
     setRoomSearchQuery('');
     if (normalizedNavigationTarget.roomId !== undefined) {
       selectRoom(normalizedNavigationTarget.roomId);
@@ -817,6 +823,31 @@ export const ChatWidget = ({
     }
   };
 
+  const handleActivityItemClick = (item: ChatActivityItem): void => {
+    setLocalNavigationTarget(item.target);
+    setRoomSearchQuery('');
+    callbacks?.onNavigationTargetChange?.(item.target);
+
+    if (item.target.roomId !== undefined) {
+      selectRoom(item.target.roomId);
+    }
+
+    if (item.target.taskId !== undefined) {
+      recentTaskRoomIdsRef.current = [
+        ...rooms.filter((room) => room.taskId === item.target.taskId).map((room) => room.id),
+        ...recentTaskRoomIdsRef.current,
+      ].slice(0, 5);
+    }
+
+    if (item.notificationId !== undefined) {
+      const notification = notifications.find((candidate) => candidate.id === item.notificationId);
+
+      if (notification !== undefined) {
+        callbacks?.onNotificationClick?.(notification);
+      }
+    }
+  };
+
   const shellClassName = ['chat-ui-root', `chat-ui-${mode}`, className].filter(Boolean).join(' ');
 
   return (
@@ -964,9 +995,9 @@ export const ChatWidget = ({
           selectedRoom={selectedRoom}
           currentUserId={currentUser.id}
           presenceByUserId={presenceByUserId}
-          {...(selectedRoomId === normalizedNavigationTarget?.roomId &&
-          normalizedNavigationTarget.messageId !== undefined
-            ? { highlightedMessageId: normalizedNavigationTarget.messageId }
+          {...(selectedRoomId === focusedNavigationTarget?.roomId &&
+          focusedNavigationTarget.messageId !== undefined
+            ? { highlightedMessageId: focusedNavigationTarget.messageId }
             : {})}
           isLoading={isLoadingMessages}
           onRetryMessage={(messageId) => void handleRetryMessage(messageId)}
@@ -984,12 +1015,12 @@ export const ChatWidget = ({
         />
       </section>
 
-      <NotificationsPanel
-        notifications={notifications}
+      <ActivityPanel
+        items={activityItems}
         isLoading={isLoadingNotifications}
         emptyLabel={labels?.notificationsEmpty}
         onMarkNotificationRead={(notificationId) => void handleMarkNotificationRead(notificationId)}
-        onNotificationClick={callbacks?.onNotificationClick}
+        onActivityItemClick={handleActivityItemClick}
       />
     </main>
   );
