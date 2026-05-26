@@ -87,7 +87,10 @@ export const ActivityPanel = ({
           <p className="chat-ui-empty-state">{emptyLabel}</p>
         ) : null}
         {sections.needsAttention.length > 0 ? (
-          <section className="chat-ui-activity-section" aria-label="Needs attention">
+          <section
+            className="chat-ui-activity-section chat-ui-activity-section-attention"
+            aria-label="Needs attention"
+          >
             <p className="chat-ui-room-group-label">Needs attention</p>
             {sections.needsAttention.map((item) =>
               renderActivityItem(item, onActivityItemClick, onMarkNotificationRead),
@@ -95,7 +98,10 @@ export const ActivityPanel = ({
           </section>
         ) : null}
         {sections.recentActivity.length > 0 ? (
-          <section className="chat-ui-activity-section" aria-label="Recent activity">
+          <section
+            className="chat-ui-activity-section chat-ui-activity-section-recent"
+            aria-label="Recent activity"
+          >
             <p className="chat-ui-room-group-label">Recent activity</p>
             {sections.recentActivity.map((item) =>
               renderActivityItem(item, onActivityItemClick, onMarkNotificationRead),

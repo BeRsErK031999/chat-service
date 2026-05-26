@@ -30,6 +30,8 @@ const sections = [
       'Native overlay opens from the titlebar launcher',
       'Rooms render with task grouping, unread cues, and notification cues',
       'ActivityPanel renders Needs attention and Recent activity from existing notification and room primitives',
+      'ActivityPanel stays visible but compact; Needs attention does not completely crowd out Recent activity',
+      'Message list remains usable at desktop overlay width while long task, room, and message titles truncate safely',
       'Clicking a recent activity item navigates through the normalized/canonical target to the expected room without remounting ChatWidget',
       'Clicking an attention activity item opens the expected room/message/task and preserves the message highlight when messageId is present',
       'Close/reopen restores the canonical activity/task/message target from local continuity storage',
