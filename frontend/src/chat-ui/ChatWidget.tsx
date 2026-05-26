@@ -101,10 +101,10 @@ export const ChatWidget = ({
   );
   const [lookupRoomId, setLookupRoomId] = useState<string | null>(null);
   const [initialRequestedRoomId, setInitialRequestedRoomId] = useState<string | null>(
-    initialRoomId ?? null,
+    initialRoomId ?? rememberedNavigationTarget?.roomId ?? null,
   );
   const requestedRoomId =
-    explicitRoomId ?? lookupRoomId ?? initialRequestedRoomId ?? rememberedNavigationTarget?.roomId ?? null;
+    explicitRoomId ?? lookupRoomId ?? initialRequestedRoomId ?? null;
   const [rooms, setRooms] = useState<RoomListItem[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(requestedRoomId);
   const [messages, setMessages] = useState<Message[]>([]);
