@@ -1,4 +1,5 @@
-import type { ReactElement } from 'react';
+import { useMemo, useRef } from 'react';
+import type { KeyboardEvent, ReactElement } from 'react';
 
 import { splitChatActivityItems } from '../activity';
 import type { ChatActivityItem } from '../types';
@@ -10,6 +11,7 @@ type ActivityPanelProps = {
   emptyLabel?: string | undefined;
   onActivityItemClick: (item: ChatActivityItem) => void;
   onMarkNotificationRead: (notificationId: string) => void;
+  onEscape?: () => void;
 };
 
 const getActivityCue = (item: ChatActivityItem): string => {
@@ -36,6 +38,8 @@ const renderActivityItem = (
   item: ChatActivityItem,
   onActivityItemClick: (item: ChatActivityItem) => void,
   onMarkNotificationRead: (notificationId: string) => void,
+  registerActivityButton: (itemId: string, element: HTMLButtonElement | null) => void,
+  onActivityItemKeyDown: (event: KeyboardEvent<HTMLButtonElement>, item: ChatActivityItem) => void,
 ): ReactElement => {
   const isUnread = item.attentionState === 'attention-needed';
   const unreadNotificationId = isUnread ? item.notificationId : undefined;
@@ -45,7 +49,14 @@ const renderActivityItem = (
       key={item.id}
       className={isUnread ? 'chat-ui-activity-item chat-ui-activity-unread' : 'chat-ui-activity-item'}
     >
-      <button type="button" className="chat-ui-activity-open" onClick={() => onActivityItemClick(item)}>
+      <button
+        ref={(element) => registerActivityButton(item.id, element)}
+        type="button"
+        className="chat-ui-activity-open"
+        aria-label={`Open activity: ${item.title}`}
+        onClick={() => onActivityItemClick(item)}
+        onKeyDown={(event) => onActivityItemKeyDown(event, item)}
+      >
         <span className="chat-ui-notification-meta">
           <span>{getActivityCue(item)}</span>
           <span>{getActivityScope(item)}</span>
@@ -69,8 +80,68 @@ export const ActivityPanel = ({
   emptyLabel = 'No activity yet.',
   onActivityItemClick,
   onMarkNotificationRead,
+  onEscape,
 }: ActivityPanelProps): ReactElement => {
   const sections = splitChatActivityItems(items);
+  const orderedItems = useMemo(
+    () => [...sections.needsAttention, ...sections.recentActivity],
+    [sections.needsAttention, sections.recentActivity],
+  );
+  const activityButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+
+  const registerActivityButton = (itemId: string, element: HTMLButtonElement | null): void => {
+    if (element === null) {
+      activityButtonRefs.current.delete(itemId);
+      return;
+    }
+
+    activityButtonRefs.current.set(itemId, element);
+  };
+
+  const focusRelativeActivityItem = (item: ChatActivityItem, direction: 1 | -1): void => {
+    if (orderedItems.length === 0) {
+      return;
+    }
+
+    const selectedIndex = orderedItems.findIndex((activityItem) => activityItem.id === item.id);
+    const fallbackIndex = direction === 1 ? 0 : orderedItems.length - 1;
+    const nextIndex =
+      selectedIndex === -1
+        ? fallbackIndex
+        : (selectedIndex + direction + orderedItems.length) % orderedItems.length;
+    const nextItem = orderedItems[nextIndex];
+
+    if (nextItem === undefined) {
+      return;
+    }
+
+    const nextButton = activityButtonRefs.current.get(nextItem.id);
+    nextButton?.focus({ preventScroll: true });
+    nextButton?.scrollIntoView({ block: 'nearest' });
+  };
+
+  const handleActivityItemKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    item: ChatActivityItem,
+  ): void => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      focusRelativeActivityItem(item, 1);
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      focusRelativeActivityItem(item, -1);
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.currentTarget.blur();
+      onEscape?.();
+    }
+  };
 
   return (
     <aside className="chat-ui-activity-panel">
@@ -93,7 +164,13 @@ export const ActivityPanel = ({
           >
             <p className="chat-ui-room-group-label">Needs attention</p>
             {sections.needsAttention.map((item) =>
-              renderActivityItem(item, onActivityItemClick, onMarkNotificationRead),
+              renderActivityItem(
+                item,
+                onActivityItemClick,
+                onMarkNotificationRead,
+                registerActivityButton,
+                handleActivityItemKeyDown,
+              ),
             )}
           </section>
         ) : null}
@@ -104,7 +181,13 @@ export const ActivityPanel = ({
           >
             <p className="chat-ui-room-group-label">Recent activity</p>
             {sections.recentActivity.map((item) =>
-              renderActivityItem(item, onActivityItemClick, onMarkNotificationRead),
+              renderActivityItem(
+                item,
+                onActivityItemClick,
+                onMarkNotificationRead,
+                registerActivityButton,
+                handleActivityItemKeyDown,
+              ),
             )}
           </section>
         ) : null}

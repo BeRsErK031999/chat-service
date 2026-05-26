@@ -201,6 +201,12 @@ export const ChatWidget = ({
     () => buildChatActivityItems({ rooms, notifications }),
     [notifications, rooms],
   );
+  const attentionActivityItems = useMemo(
+    () => activityItems.filter((item) => item.attentionState === 'attention-needed'),
+    [activityItems],
+  );
+  const workflowActivityItems =
+    attentionActivityItems.length > 0 ? attentionActivityItems : activityItems;
   const focusedNavigationTarget = normalizedNavigationTarget ?? localNavigationTarget;
 
   const visibleMessages = useMemo<ChatMessage[]>(
@@ -283,6 +289,15 @@ export const ChatWidget = ({
       selectRoom(latestTaskRoom.id);
     }
   }, [rooms, selectRoom]);
+
+  const focusComposer = useCallback((): void => {
+    if (selectedRoom === null) {
+      roomSearchInputRef.current?.focus();
+      return;
+    }
+
+    composerInputRef.current?.focus({ preventScroll: true });
+  }, [selectedRoom]);
 
   const openRelatedDiscussion = useCallback((): void => {
     const relatedTaskId = selectedRoom?.taskId ?? context?.taskId ?? null;
@@ -491,6 +506,60 @@ export const ChatWidget = ({
     onRealtimeDiagnostic: callbacks?.onRealtimeDiagnostic,
   });
 
+  const openActivityItem = useCallback(
+    (item: ChatActivityItem): void => {
+      setLocalNavigationTarget(item.target);
+      rememberNavigationTarget(item.target);
+      if (lastRememberedNavigationTargetIdRef.current !== item.target.id) {
+        lastRememberedNavigationTargetIdRef.current = item.target.id;
+        callbacks?.onRealtimeDiagnostic?.({
+          kind: 'navigation_target_remembered',
+          status: realtimeStatus,
+          timestamp: new Date().toISOString(),
+          selectedRoomId: item.target.roomId ?? selectedRoomId,
+          roomCount: rooms.length,
+          unreadCount:
+            rooms.reduce((total, room) => total + room.unreadCount, 0) +
+            notifications.filter((notification) => notification.readAt === null).length,
+        });
+      }
+      setRoomSearchQuery('');
+
+      if (item.target.roomId !== undefined) {
+        selectRoom(item.target.roomId);
+      }
+
+      if (item.target.taskId !== undefined) {
+        recentTaskRoomIdsRef.current = [
+          ...rooms.filter((room) => room.taskId === item.target.taskId).map((room) => room.id),
+          ...recentTaskRoomIdsRef.current,
+        ].slice(0, 5);
+      }
+    },
+    [callbacks, notifications, realtimeStatus, rooms, selectRoom, selectedRoomId],
+  );
+
+  const selectRelativeActivityItem = useCallback(
+    (candidates: readonly ChatActivityItem[], direction: 1 | -1): void => {
+      if (candidates.length === 0) {
+        return;
+      }
+
+      const selectedIndex = candidates.findIndex((item) => item.target.roomId === selectedRoomId);
+      const fallbackIndex = direction === 1 ? 0 : candidates.length - 1;
+      const nextIndex =
+        selectedIndex === -1
+          ? fallbackIndex
+          : (selectedIndex + direction + candidates.length) % candidates.length;
+      const nextItem = candidates[nextIndex];
+
+      if (nextItem !== undefined) {
+        openActivityItem(nextItem);
+      }
+    },
+    [openActivityItem, selectedRoomId],
+  );
+
   const currentUserPresence = useMemo<PresenceState>(
     () => ({
       status: realtimeStatus === 'connected' ? 'online' : 'offline',
@@ -641,12 +710,12 @@ export const ChatWidget = ({
   }, [selectedRoom]);
 
   useEffect(() => {
-    if (selectedRoomId === null) {
+    if (selectedRoom === null) {
       return;
     }
 
-    composerInputRef.current?.focus();
-  }, [selectedRoomId]);
+    composerInputRef.current?.focus({ preventScroll: true });
+  }, [selectedRoom]);
 
   useEffect(() => {
     if (
@@ -717,13 +786,13 @@ export const ChatWidget = ({
 
       if (event.altKey && event.shiftKey && event.key === 'ArrowDown') {
         event.preventDefault();
-        selectRelativeRoom(unreadRooms, 1);
+        selectRelativeActivityItem(workflowActivityItems, 1);
         return;
       }
 
       if (event.altKey && event.shiftKey && event.key === 'ArrowUp') {
         event.preventDefault();
-        selectRelativeRoom(unreadRooms, -1);
+        selectRelativeActivityItem(workflowActivityItems, -1);
         return;
       }
 
@@ -762,7 +831,15 @@ export const ChatWidget = ({
     window.addEventListener('keydown', handleKeyDown);
 
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeDiscussionRooms, roomSearchQuery, rooms, selectRelativeRoom, selectRoom, unreadRooms]);
+  }, [
+    activeDiscussionRooms,
+    roomSearchQuery,
+    rooms,
+    selectRelativeActivityItem,
+    selectRelativeRoom,
+    selectRoom,
+    workflowActivityItems,
+  ]);
 
   const sendDraft = async (body: string, idempotencyKey: string, localMessageId: string): Promise<void> => {
     if (selectedRoomId === null) {
@@ -920,39 +997,6 @@ export const ChatWidget = ({
       setError(reportError(caughtError, 'Failed to mark notification read.'));
     }
   };
-
-  const handleActivityItemClick = useCallback(
-    (item: ChatActivityItem): void => {
-      setLocalNavigationTarget(item.target);
-      rememberNavigationTarget(item.target);
-      if (lastRememberedNavigationTargetIdRef.current !== item.target.id) {
-        lastRememberedNavigationTargetIdRef.current = item.target.id;
-        callbacks?.onRealtimeDiagnostic?.({
-          kind: 'navigation_target_remembered',
-          status: realtimeStatus,
-          timestamp: new Date().toISOString(),
-          selectedRoomId: item.target.roomId ?? selectedRoomId,
-          roomCount: rooms.length,
-          unreadCount:
-            rooms.reduce((total, room) => total + room.unreadCount, 0) +
-            notifications.filter((notification) => notification.readAt === null).length,
-        });
-      }
-      setRoomSearchQuery('');
-
-      if (item.target.roomId !== undefined) {
-        selectRoom(item.target.roomId);
-      }
-
-      if (item.target.taskId !== undefined) {
-        recentTaskRoomIdsRef.current = [
-          ...rooms.filter((room) => room.taskId === item.target.taskId).map((room) => room.id),
-          ...recentTaskRoomIdsRef.current,
-        ].slice(0, 5);
-      }
-    },
-    [callbacks, notifications, realtimeStatus, rooms, selectRoom, selectedRoomId],
-  );
 
   const shellClassName = ['chat-ui-root', `chat-ui-${mode}`, className].filter(Boolean).join(' ');
 
@@ -1126,7 +1170,8 @@ export const ChatWidget = ({
         isLoading={isLoadingNotifications}
         emptyLabel={labels?.notificationsEmpty}
         onMarkNotificationRead={(notificationId) => void handleMarkNotificationRead(notificationId)}
-        onActivityItemClick={handleActivityItemClick}
+        onActivityItemClick={openActivityItem}
+        onEscape={focusComposer}
       />
     </main>
   );
