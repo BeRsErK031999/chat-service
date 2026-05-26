@@ -19,8 +19,9 @@ notification, storing the last normalized navigation target, and passing the res
 Reusable `chat-ui` must not know about Electron windows, tray behavior, protocol handlers, or browser history.
 Future desktop inbox/feed surfaces should consume shared `ChatActivityItem` targets and keep Electron window behavior in
 the adapter layer.
-Future typing indicators should consume `ChatInteractionHint` semantics and must keep debounce, stale expiry, and
-non-persistence guarantees intact.
+Future typing indicators should consume `ChatInteractionHint` semantics and must keep debounce, stale expiry,
+non-persistence, no-notification, no-unread, and no-backend-request guarantees intact. The current interaction hint
+work is a local/platform-neutral foundation only, not a production typing feature.
 
 Rocket.Chat is not the core chat runtime. It remains historical prototype context only. Do not add new Rocket.Chat,
 WebSocket, NATS, Redis, Kubernetes, or microservice-split work as part of ordinary chat changes.
@@ -76,6 +77,10 @@ duplicating persisted messages. Do not remove or regenerate the idempotency key 
 
 Presence is lightweight and SSE-only. It uses connection transitions plus `User.lastSeenAt`; it is not a durable global
 fanout layer and does not require Redis/NATS.
+
+Interaction hints are separate from realtime presence. `viewing` and `active_in_room` hints can be emitted locally
+through `onInteractionHintsChange`, but they do not create `room.typing`/`room.activity` backend fanout yet, do not
+persist state, do not change notifications or unread counts, and must not recreate EventSource connections.
 
 Notification routing is service-owned. Message sends create notification records for relevant users, emit notification
 events over SSE, and drive unread badges in the reusable widget and desktop launcher.

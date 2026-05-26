@@ -33,6 +33,7 @@ const sections = [
       'Send/retry clears optimistic pending state without duplicate messages',
       'Notification routing opens the expected room',
       'Close/reopen restores relevant chat state',
+      'Interaction hints emit locally through onInteractionHintsChange without notification, unread, backend request, or EventSource side effects',
     ],
   },
   {

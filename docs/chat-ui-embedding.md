@@ -45,7 +45,7 @@ If `auth` is omitted, the widget uses `currentUser.id` as dev auth. Production h
 | `mode` | no | `"full"`, `"embedded"`, or `"compact"`. Defaults to `"full"`. Compact hides notifications. |
 | `enableRealtime` | no | Enables SSE realtime when `true`. Defaults to `true`; polling fallback still runs when disconnected. |
 | `className` | no | Optional class added to the widget shell for host-specific layout. |
-| `callbacks` | no | Host callbacks for unread count, room changes, message sent, task actions, auth/access errors, realtime status, close, and notifications. |
+| `callbacks` | no | Host callbacks for unread count, room changes, navigation/activity/interaction observations, message sent, task actions, auth/access errors, realtime status, close, and notifications. |
 | `labels` | no | Host text overrides for title and empty states. |
 
 ## Types
@@ -85,6 +85,9 @@ type ChatWidgetAuth =
 type ChatWidgetCallbacks = {
   onUnreadCountChange?: (count: number) => void;
   onRoomChange?: (roomId: string | null) => void;
+  onNavigationTargetChange?: (target: NormalizedChatWidgetNavigationTarget | null) => void;
+  onActivityItemsChange?: (items: ChatActivityItem[]) => void;
+  onInteractionHintsChange?: (hints: ChatInteractionHint[]) => void;
   onMessageSent?: (message: Message) => void;
   onTaskOpen?: (taskId: string) => void;
   onTaskReferenceCopy?: (taskReference: string) => void;
@@ -206,6 +209,7 @@ Rules:
 
 - hints are ephemeral and never persisted;
 - hints do not create notifications, unread counts, read states, or activity items by themselves;
+- hints do not create backend requests and do not trigger SSE reconnects;
 - default debounce is 3 seconds and default stale timeout is 10 seconds;
 - `normalizeInteractionHint` drops hints without room/user identity;
 - `pruneStaleInteractionHints` removes expired hints for future host-side display;
@@ -215,6 +219,8 @@ Rules:
 
 Future backend integration, if needed, should use an ephemeral SSE shape such as `room.activity` or `room.typing` with
 room membership fanout, explicit throttling, stale expiry, no persistence, no notifications, and no unread impact.
+Those event names are documented-only future shapes in this slice; there is no backend fanout or production typing
+indicator UI.
 
 ## Desktop Example
 

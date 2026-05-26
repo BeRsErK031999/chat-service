@@ -32,6 +32,14 @@ const sections = [
     ],
   },
   {
+    title: 'Interaction hint side-effect check',
+    items: [
+      'Switch active rooms and, when the host wires onInteractionHintsChange, observe local viewing or active_in_room hints.',
+      'Expected: repeated same-room hints are debounced, stale hints expire after the documented timeout, and activeEventSourceCount remains 1.',
+      'Unhealthy: hints create backend requests, notifications, unread changes, room.typing/room.activity fanout, or EventSource reconnect churn.',
+    ],
+  },
+  {
     title: 'Safe diagnostic review',
     items: [
       'Allowed fields: kind, status, timestamp, eventName, selectedRoomId, lifecycle counters, timestamps, roomCount, and unreadCount.',

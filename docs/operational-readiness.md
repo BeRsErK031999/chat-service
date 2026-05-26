@@ -125,7 +125,8 @@ Desktop renderer smoke:
 - Activity references remain derived from existing notifications and rooms, route through navigation targets, and do not
   create EventSource churn.
 - Interaction hints remain ephemeral, debounced, stale-expiring, and do not affect notifications, unread counts, or SSE
-  lifecycle.
+  lifecycle. `room.typing` and `room.activity` remain documented-only future event shapes; there is no backend fanout,
+  persistence, or production typing UI in this foundation slice.
 
 CORS and Private Network Access smoke from the desktop dev origin:
 

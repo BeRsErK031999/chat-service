@@ -198,6 +198,9 @@ Use this checklist after task-centric UX or desktop snapshot changes. Record onl
 12. Retry the same send path with the same `Idempotency-Key` through the API and confirm one persisted message id.
 13. Mark a room read and confirm `room.read` updates unread state.
 14. Confirm presence indicators render when `presence.changed` events are observed.
+15. If the host wires `onInteractionHintsChange`, switch rooms and confirm local `viewing`/`active_in_room` hints emit
+    with 3 second debounce and 10 second stale semantics, without notifications, unread changes, backend requests, or
+    EventSource reconnects.
 
 If browser automation or a second visual client is unavailable, write that limitation down instead of replacing it with a
 local code assertion.
@@ -386,7 +389,9 @@ curl -i -X POST "http://192.168.22.37/chat/api/notifications/$NOTIFICATION_ID/re
 
 - No WebSocket or Socket.IO.
 - No production login system; bearer tokens are supplied by the host or generated manually for internal testing.
-- No file upload, reactions, typing indicators, edit, or delete.
+- No file upload, reactions, production typing indicators, edit, or delete.
+- Interaction hints are local foundation only; future `room.typing`/`room.activity` event shapes are documented but not
+  implemented as backend fanout.
 - Polling fallback refreshes messages, rooms, and notifications when SSE is disconnected or disabled.
 - New user messages create unread backend notifications for other active room members.
 - The layout is intended for desktop internal testing, not mobile use.
