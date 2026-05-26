@@ -1,4 +1,11 @@
 export { ChatWidget } from './ChatWidget';
+export {
+  navigationTargetFromNotification,
+  navigationTargetFromRoom,
+  normalizeNavigationTarget,
+  parseNavigationTarget,
+  serializeNavigationTarget,
+} from './navigation';
 export type {
   ChatUser,
   ChatWidgetAuth,
@@ -7,6 +14,7 @@ export type {
   ChatWidgetLabels,
   ChatWidgetMode,
   ChatWidgetNavigationTarget,
+  ChatWidgetNavigationSource,
   ChatWidgetProps,
   ChatWidgetRoomScope,
   ChatWidgetUser,
@@ -14,6 +22,7 @@ export type {
   ChatRealtimeDiagnosticKind,
   Message,
   MessageType,
+  NormalizedChatWidgetNavigationTarget,
   Notification,
   RealtimeStatus,
   RoomListItem,

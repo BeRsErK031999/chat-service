@@ -14,6 +14,10 @@ and SSE realtime events.
 launcher, overlay lifecycle, desktop session lookup, Electron IPC/preload wiring, and any desktop-only adaptation around
 the reusable chat UI.
 
+Desktop also owns native continuity decisions: focusing/restoring the Electron window, opening the chat overlay from a
+notification, storing the last normalized navigation target, and passing the restored room back to `ChatWidget`.
+Reusable `chat-ui` must not know about Electron windows, tray behavior, protocol handlers, or browser history.
+
 Rocket.Chat is not the core chat runtime. It remains historical prototype context only. Do not add new Rocket.Chat,
 WebSocket, NATS, Redis, Kubernetes, or microservice-split work as part of ordinary chat changes.
 
@@ -24,7 +28,8 @@ The reusable `ChatWidget` source of truth lives in `chat-service/frontend/src/ch
 - room, message, notification, unread, draft, optimistic send, retry, selected room, and presence presentation state;
 - HTTP client calls to the chat API;
 - the SSE lifecycle through `useChatRealtime`;
-- task-centric chat context and workflow actions that can be consumed by multiple hosts.
+- task-centric chat context and workflow actions that can be consumed by multiple hosts;
+- lightweight navigation target helpers for room, message, task, notification, and future activity/inbox entry points.
 
 The desktop repo consumes a snapshot/subtree at `time-tracker-desktop/src/features/chat/chat-ui`. Desktop must not make
 product or host-specific changes inside that subtree. Shared UI changes start in `chat-service`, then flow into desktop

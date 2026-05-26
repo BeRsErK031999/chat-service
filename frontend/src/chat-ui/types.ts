@@ -83,10 +83,22 @@ export type Notification = {
   updatedAt: string;
 };
 
+export type ChatWidgetNavigationSource = 'notification' | 'task' | 'activity';
+
 export type ChatWidgetNavigationTarget = {
-  id: string;
-  roomId: string;
+  id?: string;
+  roomId?: string;
   messageId?: string;
+  taskId?: string;
+  source?: ChatWidgetNavigationSource;
+};
+
+export type NormalizedChatWidgetNavigationTarget = {
+  id: string;
+  roomId?: string;
+  messageId?: string;
+  taskId?: string;
+  source?: ChatWidgetNavigationSource;
 };
 
 export type RealtimeStatus = 'disabled' | 'connecting' | 'disconnected' | 'connected';
@@ -143,6 +155,7 @@ export type TaskRoomLookupResult = {
 export type ChatWidgetCallbacks = {
   onUnreadCountChange?: (count: number) => void;
   onRoomChange?: (roomId: string | null) => void;
+  onNavigationTargetChange?: (target: NormalizedChatWidgetNavigationTarget | null) => void;
   onMessageSent?: (message: Message) => void;
   onTaskOpen?: (taskId: string) => void;
   onTaskReferenceCopy?: (taskReference: string) => void;

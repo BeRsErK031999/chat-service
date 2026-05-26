@@ -65,6 +65,14 @@ type ChatWidgetContext = {
   source?: 'playground' | 'desktop' | 'web';
 };
 
+type ChatWidgetNavigationTarget = {
+  id?: string;
+  roomId?: string;
+  messageId?: string;
+  taskId?: string;
+  source?: 'notification' | 'task' | 'activity';
+};
+
 type ChatWidgetAuth =
   | { strategy: 'dev-user-id'; userId: string }
   | { strategy: 'cookie' }
@@ -101,6 +109,39 @@ callback, so the playground does not show close controls.
 `onTaskOpen` and `onTaskReferenceCopy` are platform-neutral workflow action hooks. The reusable widget only emits the
 task id or task reference; desktop shells, browser shells, and future hosts decide how to open tasks or write to a
 host-safe clipboard. If `onTaskReferenceCopy` is not provided, the browser widget attempts `navigator.clipboard`.
+
+`onNavigationTargetChange` is the platform-neutral continuity hook. It emits the selected room as a normalized
+navigation target with room, optional task, and source semantics so hosts can restore the same workflow entry point
+after reopen or reconnect.
+
+## Navigation Target Model
+
+`ChatWidgetNavigationTarget` is the lightweight deep-link foundation for room, task, message, notification, and future
+activity/inbox entry points:
+
+```ts
+{
+  roomId?: string;
+  messageId?: string;
+  taskId?: string;
+  source?: 'notification' | 'task' | 'activity';
+}
+```
+
+Rules:
+
+- `roomId` selects a room when the authenticated user can see it.
+- `messageId` is best-effort highlighting inside the loaded message window.
+- `taskId` preserves workflow context and primes recent task continuity; it does not create task rooms.
+- `source` records intent for notification, task, and future activity-feed surfaces.
+- empty strings and unsupported sources are dropped by `normalizeNavigationTarget`.
+- `serializeNavigationTarget` and `parseNavigationTarget` provide query-string semantics for future hosts without
+  introducing a router framework.
+- `navigationTargetFromNotification` maps backend notifications into the same model; notifications without a room use
+  safe host fallback behavior.
+
+This intentionally does not add browser history redesign, Electron protocol handlers, backend deep-link APIs, or an
+activity feed.
 
 ## Desktop Example
 
@@ -275,8 +316,9 @@ Current task-centric UI behavior:
   cycling, and `Ctrl`/`Cmd+Shift+L` to return to the previous discussion.
 - Hosts can route notification clicks by passing `navigationTarget`; room selection is guaranteed, while message
   highlight is best-effort for messages present in the currently loaded message window.
-- Hosts can preserve task/discussion context after shell reopen by passing the last observed `onRoomChange` value back
-  as `initialRoomId`. `context.roomId` still takes precedence for explicit routing.
+- Hosts can preserve task/discussion context after shell reopen by storing the last observed
+  `onNavigationTargetChange` value and passing its room back as `initialRoomId`. `context.roomId` still takes
+  precedence for explicit routing.
 - Task rooms get a task discussion label and stronger unread badge styling.
 - Room rows show existing room type/scope metadata when available.
 - Room rows now surface lightweight workflow awareness from existing room data: unread rooms are marked as needing
@@ -302,6 +344,7 @@ The reusable layer owns:
 
 - `ChatWidget`
 - host-facing public types
+- platform-neutral navigation target helpers for normalize, parse, serialize, room, and notification targets
 - API client creation from `apiBaseUrl` and `auth`
 - SSE realtime hook with connecting/connected/disconnected state callback
 - stable `EventSource` lifecycle across room switching through refs for selected room and refresh handlers
@@ -316,6 +359,7 @@ The reusable layer owns:
 - workflow awareness cues derived from existing rooms, notifications, visible messages, and SSE presence state
 - command-like navigation/action behavior, including unread traversal, active discussion cycling, previous discussion
   return, recent task room recall, local mark-unread emphasis, and platform-neutral task action callbacks
+- platform-neutral target semantics for future activity feed, inbox, and attention-needed surfaces
 
 The playground layer owns:
 
@@ -339,6 +383,7 @@ tokens and never receives `CHAT_INTERNAL_AUTH_SECRET`.
 - Mark unread is a local attention-management affordance in the widget; the current backend API only persists mark read.
 - Message highlighting through `navigationTarget.messageId` is best-effort for messages present in the loaded message
   window.
+- Navigation targets do not add browser history, Electron protocol handlers, backend lookup redesign, or a full router.
 - Browser automation smoke may be unavailable in some local Codex sessions; do not record browser playground success
   unless the browser tooling actually ran.
 
