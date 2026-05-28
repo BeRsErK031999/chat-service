@@ -75,7 +75,7 @@
 
 .chat-ui-activity-panel {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   overflow: hidden;
 }
 
@@ -419,6 +419,52 @@
 .chat-ui-activity-panel .chat-ui-panel-header strong {
   color: #405064;
   font-size: 13px;
+}
+
+.chat-ui-panel-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-ui-shortcuts-button {
+  width: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  color: #405064;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.chat-ui-shortcuts-help {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #cdd6dd;
+  background: #eef4f3;
+  color: #405064;
+  font-size: 11px;
+}
+
+.chat-ui-shortcuts-help div {
+  display: grid;
+  grid-template-columns: minmax(0, 124px) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.chat-ui-shortcuts-help kbd {
+  min-width: 0;
+  padding: 2px 5px;
+  border: 1px solid #b9c5cf;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #283545;
+  font: inherit;
+  font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 .chat-ui-activity-section {

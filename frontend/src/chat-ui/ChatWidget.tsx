@@ -117,6 +117,7 @@ export const ChatWidget = ({
   const [draft, setDraft] = useState('');
   const [localNavigationTarget, setLocalNavigationTarget] =
     useState<NormalizedChatWidgetNavigationTarget | null>(rememberedNavigationTarget);
+  const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
@@ -138,6 +139,7 @@ export const ChatWidget = ({
   const recentTaskRoomIdsRef = useRef<string[]>([]);
   const roomSearchInputRef = useRef<HTMLInputElement | null>(null);
   const composerInputRef = useRef<HTMLInputElement | null>(null);
+  const shortcutHelpButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const reportError = useCallback(
     (caughtError: unknown, fallback: string, notifyAccessDenied = false): string => {
@@ -784,6 +786,13 @@ export const ChatWidget = ({
         return;
       }
 
+      if (event.key === '?') {
+        event.preventDefault();
+        setIsShortcutHelpOpen(true);
+        shortcutHelpButtonRef.current?.focus({ preventScroll: true });
+        return;
+      }
+
       if (event.altKey && event.shiftKey && event.key === 'ArrowDown') {
         event.preventDefault();
         selectRelativeActivityItem(workflowActivityItems, 1);
@@ -1169,8 +1178,11 @@ export const ChatWidget = ({
         items={activityItems}
         isLoading={isLoadingNotifications}
         emptyLabel={labels?.notificationsEmpty}
+        isShortcutHelpOpen={isShortcutHelpOpen}
+        shortcutHelpButtonRef={shortcutHelpButtonRef}
         onMarkNotificationRead={(notificationId) => void handleMarkNotificationRead(notificationId)}
         onActivityItemClick={openActivityItem}
+        onShortcutHelpOpenChange={setIsShortcutHelpOpen}
         onEscape={focusComposer}
       />
     </main>

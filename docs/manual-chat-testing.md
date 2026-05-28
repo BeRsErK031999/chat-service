@@ -188,24 +188,27 @@ Use this checklist after task-centric UX or desktop snapshot changes. Record onl
 7. Use the header actions to jump to next unread, return to the previous discussion, reopen a recent task room, open a
    related discussion, mark read, and mark unread.
 8. Use keyboard traversal: `Alt+ArrowUp`/`Alt+ArrowDown` for previous/next room,
-   `Alt+Shift+ArrowUp`/`Alt+Shift+ArrowDown` for previous/next unread room, `Ctrl`/`Cmd+Shift+A` for active discussion
+   `Alt+Shift+ArrowUp`/`Alt+Shift+ArrowDown` for workflow activity cycling, `Ctrl`/`Cmd+Shift+A` for active discussion
    cycling, and `Ctrl`/`Cmd+Shift+L` for previous discussion.
-9. In a task room, confirm task reference chips render and `Copy ref` writes the task reference when browser clipboard is
+9. Open the compact ActivityPanel shortcut help with the `?` button or `?` key. Confirm it documents activity arrows,
+   `Enter`, `Escape`, room switching, workflow activity cycling, search shortcuts, and closes with `Escape` without
+   trapping focus or covering the message area.
+10. In a task room, confirm task reference chips render and `Copy ref` writes the task reference when browser clipboard is
    available.
-10. Route a notification through `navigationTarget` and confirm the target room opens. Message highlight is best-effort
+11. Route a notification through `navigationTarget` and confirm the target room opens. Message highlight is best-effort
     when the target message is in the loaded message window.
-11. Confirm ActivityPanel renders Needs attention and Recent activity. Click an activity item with a message target and
+12. Confirm ActivityPanel renders Needs attention and Recent activity. Click an activity item with a message target and
     confirm the room opens through a canonical `chat-nav:v1?...` target and highlights the message when loaded.
-12. Close and reopen the host surface and confirm room, task, and room+message continuity restore. After restore,
+13. Close and reopen the host surface and confirm room, task, and room+message continuity restore. After restore,
     ordinary room clicks, Back, and Recent task must still work and must not be pinned by the remembered target.
-13. If possible, write a malformed continuity value into `sessionStorage`, reopen the widget, and confirm restore fails
+14. If possible, write a malformed continuity value into `sessionStorage`, reopen the widget, and confirm restore fails
     gracefully without a crash or sensitive diagnostic fields.
-14. Confirm `sessionStorage` contains no token-like values; continuity storage may contain only the canonical target
+15. Confirm `sessionStorage` contains no token-like values; continuity storage may contain only the canonical target
     string and timestamp.
-15. Send a message and confirm the peer client receives `message.created` and `notification.created`.
-16. Retry the same send path with the same `Idempotency-Key` through the API and confirm one persisted message id.
-17. Mark a room read and confirm `room.read` updates unread state.
-18. Confirm presence indicators render when `presence.changed` events are observed.
+16. Send a message and confirm the peer client receives `message.created` and `notification.created`.
+17. Retry the same send path with the same `Idempotency-Key` through the API and confirm one persisted message id.
+18. Mark a room read and confirm `room.read` updates unread state.
+19. Confirm presence indicators render when `presence.changed` events are observed.
 19. If the host wires `onInteractionHintsChange`, switch rooms and confirm local `viewing`/`active_in_room` hints emit
     with 3 second debounce and 10 second stale semantics, without notifications, unread changes, backend requests, or
     EventSource reconnects.

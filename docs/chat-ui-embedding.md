@@ -403,8 +403,11 @@ Current task-centric UI behavior:
   discussion, mark read, mark unread, reopen a recent task room, jump to next unread, and return to the previous
   discussion.
 - Keyboard traversal also supports `Alt+ArrowUp`/`Alt+ArrowDown` for previous/next room,
-  `Alt+Shift+ArrowUp`/`Alt+Shift+ArrowDown` for previous/next unread room, `Ctrl`/`Cmd+Shift+A` for active discussion
+  `Alt+Shift+ArrowUp`/`Alt+Shift+ArrowDown` for workflow activity cycling, `Ctrl`/`Cmd+Shift+A` for active discussion
   cycling, and `Ctrl`/`Cmd+Shift+L` to return to the previous discussion.
+- ActivityPanel exposes compact keyboard shortcut help through its `?` header button and the `?` shortcut when focus is
+  outside editable fields. The help opens inline in the ActivityPanel, closes with `Escape`, and does not cover the
+  message area.
 - Hosts can route notification clicks by passing `navigationTarget`; room selection is guaranteed, while message
   highlight is best-effort for messages present in the currently loaded message window.
 - Hosts can preserve task/discussion context after shell reopen by storing the last observed

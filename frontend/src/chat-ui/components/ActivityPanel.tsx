@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import type { KeyboardEvent, ReactElement } from 'react';
+import type { KeyboardEvent, ReactElement, RefObject } from 'react';
 
 import { splitChatActivityItems } from '../activity';
 import type { ChatActivityItem } from '../types';
@@ -9,10 +9,23 @@ type ActivityPanelProps = {
   items: ChatActivityItem[];
   isLoading: boolean;
   emptyLabel?: string | undefined;
+  isShortcutHelpOpen: boolean;
+  shortcutHelpButtonRef?: RefObject<HTMLButtonElement | null>;
   onActivityItemClick: (item: ChatActivityItem) => void;
   onMarkNotificationRead: (notificationId: string) => void;
+  onShortcutHelpOpenChange: (isOpen: boolean) => void;
   onEscape?: () => void;
 };
+
+const keyboardShortcuts = [
+  ['ArrowUp / ArrowDown', 'Move through activity items'],
+  ['Enter', 'Open selected activity'],
+  ['Escape', 'Return to composer/search'],
+  ['Alt+ArrowUp / Alt+ArrowDown', 'Switch rooms'],
+  ['Alt+Shift+ArrowUp / Alt+Shift+ArrowDown', 'Cycle workflow activity'],
+  ['Ctrl/Cmd+K', 'Jump to room search'],
+  ['/', 'Focus room search'],
+] as const;
 
 const getActivityCue = (item: ChatActivityItem): string => {
   if (item.kind === 'notification') {
@@ -78,8 +91,11 @@ export const ActivityPanel = ({
   items,
   isLoading,
   emptyLabel = 'No activity yet.',
+  isShortcutHelpOpen,
+  shortcutHelpButtonRef,
   onActivityItemClick,
   onMarkNotificationRead,
+  onShortcutHelpOpenChange,
   onEscape,
 }: ActivityPanelProps): ReactElement => {
   const sections = splitChatActivityItems(items);
@@ -143,15 +159,58 @@ export const ActivityPanel = ({
     }
   };
 
+  const closeShortcutHelp = (): void => {
+    onShortcutHelpOpenChange(false);
+    shortcutHelpButtonRef?.current?.focus({ preventScroll: true });
+  };
+
+  const handleShortcutHelpKeyDown = (event: KeyboardEvent): void => {
+    if (event.key !== 'Escape' || !isShortcutHelpOpen) {
+      return;
+    }
+
+    event.preventDefault();
+    closeShortcutHelp();
+  };
+
   return (
-    <aside className="chat-ui-activity-panel">
+    <aside className="chat-ui-activity-panel" onKeyDown={handleShortcutHelpKeyDown}>
       <div className="chat-ui-panel-header">
         <div>
           <p className="chat-ui-eyebrow">Activity</p>
           <strong>{sections.needsAttention.length} need attention</strong>
         </div>
-        {isLoading ? <span>Loading...</span> : null}
+        <div className="chat-ui-panel-header-actions">
+          {isLoading ? <span>Loading...</span> : null}
+          <button
+            ref={shortcutHelpButtonRef}
+            type="button"
+            className="chat-ui-shortcuts-button"
+            aria-label="Show keyboard shortcuts"
+            aria-expanded={isShortcutHelpOpen}
+            aria-controls="chat-ui-shortcuts-help"
+            title="Keyboard shortcuts"
+            onClick={() => onShortcutHelpOpenChange(!isShortcutHelpOpen)}
+          >
+            ?
+          </button>
+        </div>
       </div>
+
+      {isShortcutHelpOpen ? (
+        <section
+          id="chat-ui-shortcuts-help"
+          className="chat-ui-shortcuts-help"
+          aria-label="Keyboard shortcuts"
+        >
+          {keyboardShortcuts.map(([keys, description]) => (
+            <div key={keys}>
+              <kbd>{keys}</kbd>
+              <span>{description}</span>
+            </div>
+          ))}
+        </section>
+      ) : null}
 
       <div className="chat-ui-activity-list">
         {items.length === 0 && !isLoading ? (

@@ -19,8 +19,10 @@ const sections = [
     title: 'Activity inbox stress',
     items: [
       'Confirm ActivityPanel renders both Needs attention and Recent activity; attention-heavy data must not hide Recent activity from the smoke path.',
+      'Open and close the compact shortcut help with the ? button, ? key, and Escape before continuing activity traversal.',
       'Click Needs attention and Recent activity items repeatedly, including entries with messageId and taskId targets.',
       'Expected: selected room and message highlight follow the normalized/canonical target, Back returns to the previous discussion, and ChatWidget stays mounted.',
+      'Expected: shortcut help does not create EventSource churn, does not trap focus, and leaves activity arrows/Enter usable after closing.',
       'Expected: after restore, remembered targets do not pin requestedRoomId; ordinary room clicks, Back, Recent task, and activity clicks still work.',
       'Unhealthy: activity clicks recreate the EventSource, clear selected room continuity unexpectedly, pin navigation to a restored room, or emit token/accessToken values in diagnostics.',
     ],
