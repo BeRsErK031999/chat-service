@@ -202,6 +202,10 @@ Healthy long-session signals:
   pending sends.
 - activity restore, message highlight restore, task restore, Back, and Recent task all work without EventSource churn;
 - malformed continuity storage reports restore skipped/failed without crash and without sensitive diagnostic fields.
+- Automated runtime regression guardrails now cover canonical target roundtrip, continuity storage failure modes,
+  ActivityPanel keyboard actions/traversal, sanitized diagnostics, and EventSource lifecycle counters.
+- Reusable test/dev assertions are available from the chat UI package: `assertSingleEventSource()`,
+  `assertNoLeakMarkers()`, `assertNoTokenDiagnostics()`, and `assertRuntimeDiagnosticsSafe()`.
 
 Unhealthy signals:
 

@@ -31,6 +31,12 @@ export {
   rememberNavigationTarget,
   restoreNavigationTargetFromCanonical,
 } from './navigationContinuity';
+export {
+  assertNoLeakMarkers,
+  assertNoTokenDiagnostics,
+  assertRuntimeDiagnosticsSafe,
+  assertSingleEventSource,
+} from './runtimeAssertions';
 export type {
   BuildChatActivityItemsInput,
   ChatActivitySections,

@@ -9,6 +9,7 @@ import {
   restoreNavigationTargetFromCanonical,
 } from '../frontend/src/chat-ui/navigationContinuity.js';
 import { parseNavigationTarget } from '../frontend/src/chat-ui/navigation.js';
+import { assertNoTokenDiagnostics } from '../frontend/src/chat-ui/runtimeAssertions.js';
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();
@@ -171,11 +172,34 @@ describe('chat UI navigation continuity', () => {
 
     const storedValue = storage.getItem(NAVIGATION_CONTINUITY_STORAGE_KEY) ?? '';
 
-    expect(storedValue).not.toContain('bearer');
-    expect(storedValue).not.toContain('accessToken');
-    expect(storedValue).not.toContain('Authorization');
+    expect(() => assertNoTokenDiagnostics(storedValue)).not.toThrow();
     expect(storedValue).not.toContain('displayName');
     expect(storedValue).not.toContain('body');
     expect(storedValue).not.toContain('secret');
+  });
+
+  it('keeps restored targets as initial hints rather than persistent navigation pins', () => {
+    const storage = new MemoryStorage();
+    setSessionStorage(storage);
+
+    rememberNavigationTarget({
+      roomId: 'restored-room',
+      messageId: 'restored-message',
+      taskId: 'restored-task',
+      source: 'activity',
+    });
+
+    const restoredTarget = getRememberedNavigationTarget();
+    const manualRoomTarget = restoreNavigationTargetFromCanonical(
+      'chat-nav:v1?roomId=manual-room&taskId=manual-task&source=activity',
+    );
+
+    expect(restoredTarget?.roomId).toBe('restored-room');
+    expect(manualRoomTarget).toEqual({
+      id: 'chat-nav:v1?roomId=manual-room&taskId=manual-task&source=activity',
+      roomId: 'manual-room',
+      taskId: 'manual-task',
+      source: 'activity',
+    });
   });
 });

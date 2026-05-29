@@ -3,6 +3,10 @@ import type { KeyboardEvent, ReactElement, RefObject } from 'react';
 
 import { splitChatActivityItems } from '../activity';
 import type { ChatActivityItem } from '../types';
+import {
+  getActivityItemKeyboardAction,
+  getRelativeActivityItemId,
+} from './activityKeyboard';
 import { formatTime } from './formatters';
 
 type ActivityPanelProps = {
@@ -133,23 +137,17 @@ export const ActivityPanel = ({
   };
 
   const focusRelativeActivityItem = (item: ChatActivityItem, direction: 1 | -1): void => {
-    if (orderedItems.length === 0) {
+    const nextItemId = getRelativeActivityItemId(
+      orderedItems.map((activityItem) => activityItem.id),
+      item.id,
+      direction,
+    );
+
+    if (nextItemId === null) {
       return;
     }
 
-    const selectedIndex = orderedItems.findIndex((activityItem) => activityItem.id === item.id);
-    const fallbackIndex = direction === 1 ? 0 : orderedItems.length - 1;
-    const nextIndex =
-      selectedIndex === -1
-        ? fallbackIndex
-        : (selectedIndex + direction + orderedItems.length) % orderedItems.length;
-    const nextItem = orderedItems[nextIndex];
-
-    if (nextItem === undefined) {
-      return;
-    }
-
-    const nextButton = activityButtonRefs.current.get(nextItem.id);
+    const nextButton = activityButtonRefs.current.get(nextItemId);
     nextButton?.focus({ preventScroll: true });
     nextButton?.scrollIntoView({ block: 'nearest' });
   };
@@ -158,35 +156,31 @@ export const ActivityPanel = ({
     event: KeyboardEvent<HTMLButtonElement>,
     item: ChatActivityItem,
   ): void => {
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      focusRelativeActivityItem(item, 1);
+    const action = getActivityItemKeyboardAction(event, item);
+
+    if (action.type === 'ignore') {
       return;
     }
 
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      focusRelativeActivityItem(item, -1);
+    event.preventDefault();
+
+    if (action.type === 'focus-relative') {
+      focusRelativeActivityItem(item, action.direction);
       return;
     }
 
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') {
-      event.preventDefault();
+    if (action.type === 'copy-reference') {
       onCopyActivityReference(item);
       return;
     }
 
-    if (event.shiftKey && event.key === 'Enter' && item.notificationId !== undefined) {
-      event.preventDefault();
-      onMarkNotificationRead(item.notificationId);
+    if (action.type === 'mark-read') {
+      onMarkNotificationRead(action.notificationId);
       return;
     }
 
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      event.currentTarget.blur();
-      onEscape?.();
-    }
+    event.currentTarget.blur();
+    onEscape?.();
   };
 
   const closeShortcutHelp = (): void => {

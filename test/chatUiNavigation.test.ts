@@ -74,6 +74,20 @@ describe('chat UI navigation targets', () => {
     });
   });
 
+  it('roundtrips canonical targets through serialize, parse, and normalize', () => {
+    const target = {
+      roomId: ' room-1 ',
+      messageId: ' message-1 ',
+      taskId: ' task-1 ',
+      source: 'activity' as const,
+    };
+    const canonical = serializeCanonicalNavigationTarget(target);
+    const parsed = parseNavigationTarget(canonical);
+
+    expect(parsed).toEqual(normalizeNavigationTarget(target));
+    expect(serializeCanonicalNavigationTarget(parsed)).toBe(canonical);
+  });
+
   it('parses legacy query strings through the canonical normalized id', () => {
     expect(parseNavigationTarget('source=unknown&taskId=task-1&roomId=room-1')).toEqual({
       id: `${CANONICAL_NAVIGATION_TARGET_PREFIX}?roomId=room-1&taskId=task-1`,
