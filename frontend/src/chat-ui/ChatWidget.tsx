@@ -17,10 +17,13 @@ import {
   getPresenceLabel,
   isTaskRoom,
 } from './components';
+import { DevRuntimeDiagnosticsPanel } from './components/DevRuntimeDiagnosticsPanel';
+import { CHAT_DIAGNOSTICS_ENABLED } from './devRuntimeDiagnostics';
 import { useChatClient } from './hooks/useChatClient';
 import { useChatRealtime } from './hooks/useChatRealtime';
 import { normalizeInteractionHint, shouldEmitInteractionHint } from './interaction';
 import { normalizeNavigationTarget, navigationTargetFromRoom } from './navigation';
+import { assertNoTokenDiagnostics } from './runtimeAssertions';
 import {
   getRememberedNavigationTargetResult,
   rememberNavigationTarget,
@@ -28,6 +31,7 @@ import {
 import type {
   ChatActivityItem,
   ChatMessage,
+  ChatRealtimeDiagnostic,
   ChatWidgetAuth,
   ChatInteractionHint,
   ChatWidgetProps,
@@ -117,6 +121,10 @@ export const ChatWidget = ({
   const [draft, setDraft] = useState('');
   const [localNavigationTarget, setLocalNavigationTarget] =
     useState<NormalizedChatWidgetNavigationTarget | null>(rememberedNavigationTarget);
+  const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<ChatRealtimeDiagnostic[]>([]);
+  const [lastActivityTarget, setLastActivityTarget] =
+    useState<NormalizedChatWidgetNavigationTarget | null>(null);
+  const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
   const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
@@ -211,6 +219,23 @@ export const ChatWidget = ({
   const workflowActivityItems =
     attentionActivityItems.length > 0 ? attentionActivityItems : activityItems;
   const focusedNavigationTarget = normalizedNavigationTarget ?? localNavigationTarget;
+  const recentActivityCount = activityItems.length - attentionActivityItems.length;
+  const recentTaskTarget = useMemo(() => {
+    const recentTaskRoom = recentTaskRoomIdsRef.current
+      .map((roomId) => rooms.find((room) => room.id === roomId) ?? null)
+      .find((room): room is RoomListItem => room !== null);
+
+    if (recentTaskRoom !== undefined) {
+      return navigationTargetFromRoom(recentTaskRoom, 'task');
+    }
+
+    const latestTaskRoom = sortRoomsByActivity(rooms.filter(isTaskRoom))[0];
+    return latestTaskRoom !== undefined ? navigationTargetFromRoom(latestTaskRoom, 'task') : null;
+  }, [rooms, selectedRoomId]);
+  const selectedActivity = useMemo(
+    () => activityItems.find((item) => item.id === selectedActivityId) ?? null,
+    [activityItems, selectedActivityId],
+  );
 
   const visibleMessages = useMemo<ChatMessage[]>(
     () =>
@@ -499,6 +524,27 @@ export const ChatWidget = ({
     });
   }, []);
 
+  const handleRealtimeDiagnostic = useCallback(
+    (diagnostic: ChatRealtimeDiagnostic): void => {
+      callbacks?.onRealtimeDiagnostic?.(diagnostic);
+
+      if (!CHAT_DIAGNOSTICS_ENABLED) {
+        return;
+      }
+
+      try {
+        assertNoTokenDiagnostics(diagnostic);
+      } catch {
+        return;
+      }
+
+      setRuntimeDiagnostics((currentDiagnostics) =>
+        [...currentDiagnostics, diagnostic].slice(-80),
+      );
+    },
+    [callbacks],
+  );
+
   const realtimeStatus = useChatRealtime({
     client,
     selectedRoomId,
@@ -508,16 +554,18 @@ export const ChatWidget = ({
     onNotificationsRefresh: triggerNotificationsRefresh,
     onPresenceRefresh: updatePresence,
     onRealtimeStatusChange: callbacks?.onRealtimeStatusChange,
-    onRealtimeDiagnostic: callbacks?.onRealtimeDiagnostic,
+    onRealtimeDiagnostic: handleRealtimeDiagnostic,
   });
 
   const openActivityItem = useCallback(
     (item: ChatActivityItem): void => {
+      setSelectedActivityId(item.id);
+      setLastActivityTarget(item.target);
       setLocalNavigationTarget(item.target);
       rememberNavigationTarget(item.target);
       if (lastRememberedNavigationTargetIdRef.current !== item.target.id) {
         lastRememberedNavigationTargetIdRef.current = item.target.id;
-        callbacks?.onRealtimeDiagnostic?.({
+        handleRealtimeDiagnostic({
           kind: 'navigation_target_remembered',
           status: realtimeStatus,
           timestamp: new Date().toISOString(),
@@ -541,7 +589,7 @@ export const ChatWidget = ({
         ].slice(0, 5);
       }
     },
-    [callbacks, notifications, realtimeStatus, rooms, selectRoom, selectedRoomId],
+    [handleRealtimeDiagnostic, notifications, realtimeStatus, rooms, selectRoom, selectedRoomId],
   );
 
   const selectRelativeActivityItem = useCallback(
@@ -630,7 +678,7 @@ export const ChatWidget = ({
     }
 
     hasReportedRememberedNavigationTargetRef.current = true;
-    callbacks?.onRealtimeDiagnostic?.({
+    handleRealtimeDiagnostic({
       kind:
         status === 'restored'
           ? 'navigation_target_restored'
@@ -645,7 +693,7 @@ export const ChatWidget = ({
         rooms.reduce((total, room) => total + room.unreadCount, 0) +
         notifications.filter((notification) => notification.readAt === null).length,
     });
-  }, [callbacks, notifications, realtimeStatus, rooms, selectedRoomId]);
+  }, [handleRealtimeDiagnostic, notifications, realtimeStatus, rooms, selectedRoomId]);
 
   useEffect(() => {
     const selectedNavigationTarget =
@@ -662,7 +710,7 @@ export const ChatWidget = ({
         rememberNavigationTarget(selectedNavigationTarget);
         if (lastRememberedNavigationTargetIdRef.current !== selectedNavigationTarget.id) {
           lastRememberedNavigationTargetIdRef.current = selectedNavigationTarget.id;
-          callbacks?.onRealtimeDiagnostic?.({
+          handleRealtimeDiagnostic({
             kind: 'navigation_target_remembered',
             status: realtimeStatus,
             timestamp: new Date().toISOString(),
@@ -681,7 +729,7 @@ export const ChatWidget = ({
       roomSwitchCountRef.current += 1;
       lastRoomChangeRef.current = selectedRoomId;
       callbacks?.onRoomChange?.(selectedRoomId);
-      callbacks?.onRealtimeDiagnostic?.({
+      handleRealtimeDiagnostic({
         kind: 'room_switched',
         status: realtimeStatus,
         timestamp: new Date().toISOString(),
@@ -694,8 +742,8 @@ export const ChatWidget = ({
       });
     }
   }, [
-    callbacks,
     focusedNavigationTarget,
+    handleRealtimeDiagnostic,
     notifications,
     realtimeStatus,
     rooms,
@@ -1223,6 +1271,20 @@ export const ChatWidget = ({
         onShortcutHelpOpenChange={setIsShortcutHelpOpen}
         onEscape={focusComposer}
       />
+
+      {CHAT_DIAGNOSTICS_ENABLED ? (
+        <DevRuntimeDiagnosticsPanel
+          diagnostics={runtimeDiagnostics}
+          realtimeStatus={realtimeStatus}
+          currentTarget={focusedNavigationTarget}
+          restoredTarget={rememberedNavigationTarget}
+          recentTaskTarget={recentTaskTarget}
+          lastActivityTarget={lastActivityTarget}
+          attentionCount={attentionActivityItems.length}
+          recentActivityCount={recentActivityCount}
+          selectedActivity={selectedActivity}
+        />
+      ) : null}
     </main>
   );
 };

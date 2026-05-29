@@ -8,6 +8,11 @@ import {
   getRelativeActivityItemId,
 } from '../frontend/src/chat-ui/components/activityKeyboard.js';
 import {
+  buildRuntimeAssertionStatuses,
+  buildRuntimeDiagnosticsSnapshot,
+  describeActivityItem,
+} from '../frontend/src/chat-ui/devRuntimeDiagnostics.js';
+import {
   assertNoLeakMarkers,
   assertNoTokenDiagnostics,
   assertRuntimeDiagnosticsSafe,
@@ -128,6 +133,102 @@ describe('chat UI runtime regression guardrails', () => {
         diagnostic({ kind: 'duplicate_connection_prevented', duplicateConnectionPreventionCount: 1 }),
       ]),
     ).toThrow(/leak markers/);
+  });
+
+  it('builds a safe runtime diagnostics snapshot from existing diagnostics', () => {
+    const diagnostics = [
+      diagnostic({
+        kind: 'connected',
+        status: 'connected',
+        activeEventSourceCount: 1,
+        reconnectAttemptCount: 1,
+        lastConnectedAt: '2026-05-26T11:00:00.000Z',
+      }),
+      diagnostic({
+        kind: 'duplicate_event',
+        status: 'connected',
+        eventName: 'message.created',
+        activeEventSourceCount: 1,
+      }),
+      diagnostic({
+        kind: 'reconnect_failed',
+        status: 'disconnected',
+        reconnectAttemptCount: 2,
+        reconnectFailureCount: 1,
+        activeEventSourceCount: 1,
+      }),
+    ];
+
+    expect(buildRuntimeDiagnosticsSnapshot(diagnostics, 'connected')).toEqual({
+      eventSourceState: 'disconnected',
+      activeEventSourceCount: 1,
+      reconnectCount: 2,
+      lastConnectTime: '2026-05-26T11:00:00.000Z',
+      lastReconnectTime: '2026-05-26T11:00:00.000Z',
+      leakMarkers: 0,
+      duplicateEventCount: 1,
+      duplicateConnectionPreventionCount: 0,
+      reconnectFailedCount: 1,
+    });
+  });
+
+  it('reports runtime assertion PASS and FAIL without throwing into the UI layer', () => {
+    expect(
+      buildRuntimeAssertionStatuses([
+        diagnostic({ kind: 'connected', activeEventSourceCount: 1 }),
+      ]),
+    ).toEqual([
+      { name: 'assertSingleEventSource', status: 'PASS', detail: 'ok' },
+      { name: 'assertNoLeakMarkers', status: 'PASS', detail: 'ok' },
+      { name: 'assertNoTokenDiagnostics', status: 'PASS', detail: 'ok' },
+      { name: 'assertRuntimeDiagnosticsSafe', status: 'PASS', detail: 'ok' },
+    ]);
+
+    const failedStatuses = buildRuntimeAssertionStatuses([
+      diagnostic({ kind: 'connected', activeEventSourceCount: 2 }),
+    ]);
+
+    expect(failedStatuses[0]).toMatchObject({
+      name: 'assertSingleEventSource',
+      status: 'FAIL',
+    });
+    expect(failedStatuses[3]).toMatchObject({
+      name: 'assertRuntimeDiagnosticsSafe',
+      status: 'FAIL',
+    });
+  });
+
+  it('keeps diagnostics panel activity descriptions free of message bodies and titles', () => {
+    expect(
+      describeActivityItem({
+        ...notificationActivity,
+        title: 'Authorization bearer should stay hidden',
+        summary: 'accessToken secret should stay hidden',
+      }),
+    ).toBe('id:notification:notification-1 | kind:notification | room:room-1');
+  });
+
+  it('gates the diagnostics panel behind VITE_CHAT_DIAGNOSTICS', () => {
+    const chatWidgetPath = fileURLToPath(
+      new URL('../frontend/src/chat-ui/ChatWidget.tsx', import.meta.url),
+    );
+    const panelPath = fileURLToPath(
+      new URL('../frontend/src/chat-ui/components/DevRuntimeDiagnosticsPanel.tsx', import.meta.url),
+    );
+    const helperPath = fileURLToPath(
+      new URL('../frontend/src/chat-ui/devRuntimeDiagnostics.ts', import.meta.url),
+    );
+    const chatWidgetSource = readFileSync(chatWidgetPath, 'utf8');
+    const panelSource = readFileSync(panelPath, 'utf8');
+    const helperSource = readFileSync(helperPath, 'utf8');
+
+    expect(helperSource).toContain("VITE_CHAT_DIAGNOSTICS === 'true'");
+    expect(chatWidgetSource).toContain('CHAT_DIAGNOSTICS_ENABLED ? (');
+    expect(panelSource).toContain('data-chat-diagnostics-panel="true"');
+    expect(panelSource).not.toContain('accessToken');
+    expect(panelSource).not.toContain('Authorization');
+    expect(panelSource).not.toContain('bearer');
+    expect(panelSource).not.toContain('CHAT_INTERNAL_AUTH_SECRET');
   });
 
   it('keeps selected room changes out of EventSource creation dependencies', () => {

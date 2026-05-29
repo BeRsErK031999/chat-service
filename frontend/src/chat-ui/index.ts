@@ -37,6 +37,12 @@ export {
   assertRuntimeDiagnosticsSafe,
   assertSingleEventSource,
 } from './runtimeAssertions';
+export {
+  buildRuntimeAssertionStatuses,
+  buildRuntimeDiagnosticsSnapshot,
+  describeActivityItem,
+  describeNavigationTarget,
+} from './devRuntimeDiagnostics';
 export type {
   BuildChatActivityItemsInput,
   ChatActivitySections,
@@ -48,6 +54,10 @@ export type {
   RememberedNavigationTargetResult,
   RememberedNavigationTargetStatus,
 } from './navigationContinuity';
+export type {
+  RuntimeAssertionStatus,
+  RuntimeDiagnosticsSnapshot,
+} from './devRuntimeDiagnostics';
 export type {
   ChatActivityAttentionState,
   ChatActivityItem,
