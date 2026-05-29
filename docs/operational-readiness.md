@@ -4,6 +4,9 @@ This runbook moves `chat-service` from a production-capable realtime baseline to
 collaboration platform. It complements the deploy details in `docs/server-deploy.md` and the manual smoke flows in
 `docs/manual-chat-testing.md`.
 
+For the freeze-audit view of critical runtime/security/navigation invariants and how each one is protected, see
+`docs/chat-runtime-readiness-matrix.md`.
+
 ## Release Gate
 
 Use this gate before promoting `develop` to `main` or before treating a staging deploy as rollout-ready.
