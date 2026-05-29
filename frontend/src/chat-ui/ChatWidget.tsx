@@ -180,6 +180,7 @@ export const ChatWidget = ({
     () => sortRoomsByActivity(rooms.filter((room) => room.unreadCount > 0)),
     [rooms],
   );
+  const canOpenRecentTask = useMemo(() => rooms.some(isTaskRoom), [rooms]);
 
   const activeDiscussionRooms = useMemo(() => {
     const recentActivityBoundary = getRecentActivityBoundary();
@@ -293,12 +294,14 @@ export const ChatWidget = ({
   }, [rooms, selectRoom]);
 
   const focusComposer = useCallback((): void => {
-    if (selectedRoom === null) {
-      roomSearchInputRef.current?.focus();
-      return;
-    }
+    window.requestAnimationFrame(() => {
+      if (selectedRoom === null) {
+        roomSearchInputRef.current?.focus({ preventScroll: true });
+        return;
+      }
 
-    composerInputRef.current?.focus({ preventScroll: true });
+      composerInputRef.current?.focus({ preventScroll: true });
+    });
   }, [selectedRoom]);
 
   const openRelatedDiscussion = useCallback((): void => {
@@ -998,6 +1001,36 @@ export const ChatWidget = ({
     }
   };
 
+  const handleCopyActivityReference = async (item: ChatActivityItem): Promise<void> => {
+    const activityRoom =
+      item.roomId !== undefined ? rooms.find((room) => room.id === item.roomId) : undefined;
+    const taskReferenceLabel =
+      activityRoom !== undefined && isTaskRoom(activityRoom)
+        ? getTaskReferenceLabel(activityRoom)
+        : item.taskId;
+    const taskReference = taskReferenceLabel ?? undefined;
+    const activityReference = taskReference ?? item.roomId ?? item.target.roomId;
+
+    if (activityReference === undefined) {
+      return;
+    }
+
+    if (taskReference !== undefined && callbacks?.onTaskReferenceCopy !== undefined) {
+      callbacks.onTaskReferenceCopy(taskReference);
+      return;
+    }
+
+    if (navigator.clipboard === undefined) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(activityReference);
+    } catch (caughtError) {
+      setError(reportError(caughtError, 'Failed to copy activity reference.'));
+    }
+  };
+
   const handleMarkNotificationRead = async (notificationId: string): Promise<void> => {
     try {
       await client.markNotificationRead(notificationId);
@@ -1177,10 +1210,15 @@ export const ChatWidget = ({
       <ActivityPanel
         items={activityItems}
         isLoading={isLoadingNotifications}
+        canOpenLatestUnread={unreadRooms.length > 0}
+        canOpenRecentTask={canOpenRecentTask}
         emptyLabel={labels?.notificationsEmpty}
         isShortcutHelpOpen={isShortcutHelpOpen}
         shortcutHelpButtonRef={shortcutHelpButtonRef}
+        onCopyActivityReference={(item) => void handleCopyActivityReference(item)}
         onMarkNotificationRead={(notificationId) => void handleMarkNotificationRead(notificationId)}
+        onOpenLatestUnread={() => selectRelativeRoom(unreadRooms, 1)}
+        onOpenRecentTask={selectRecentTaskRoom}
         onActivityItemClick={openActivityItem}
         onShortcutHelpOpenChange={setIsShortcutHelpOpen}
         onEscape={focusComposer}

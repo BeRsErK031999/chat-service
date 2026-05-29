@@ -8,11 +8,16 @@ import { formatTime } from './formatters';
 type ActivityPanelProps = {
   items: ChatActivityItem[];
   isLoading: boolean;
+  canOpenLatestUnread: boolean;
+  canOpenRecentTask: boolean;
   emptyLabel?: string | undefined;
   isShortcutHelpOpen: boolean;
   shortcutHelpButtonRef?: RefObject<HTMLButtonElement | null>;
   onActivityItemClick: (item: ChatActivityItem) => void;
+  onCopyActivityReference: (item: ChatActivityItem) => void;
   onMarkNotificationRead: (notificationId: string) => void;
+  onOpenLatestUnread: () => void;
+  onOpenRecentTask: () => void;
   onShortcutHelpOpenChange: (isOpen: boolean) => void;
   onEscape?: () => void;
 };
@@ -20,6 +25,8 @@ type ActivityPanelProps = {
 const keyboardShortcuts = [
   ['ArrowUp / ArrowDown', 'Move through activity items'],
   ['Enter', 'Open selected activity'],
+  ['Ctrl/Cmd+C', 'Copy selected activity ref'],
+  ['Shift+Enter', 'Mark selected notification read'],
   ['Escape', 'Return to composer/search'],
   ['Alt+ArrowUp / Alt+ArrowDown', 'Switch rooms'],
   ['Alt+Shift+ArrowUp / Alt+Shift+ArrowDown', 'Cycle workflow activity'],
@@ -50,6 +57,7 @@ const getActivityScope = (item: ChatActivityItem): string => {
 const renderActivityItem = (
   item: ChatActivityItem,
   onActivityItemClick: (item: ChatActivityItem) => void,
+  onCopyActivityReference: (item: ChatActivityItem) => void,
   onMarkNotificationRead: (notificationId: string) => void,
   registerActivityButton: (itemId: string, element: HTMLButtonElement | null) => void,
   onActivityItemKeyDown: (event: KeyboardEvent<HTMLButtonElement>, item: ChatActivityItem) => void,
@@ -78,11 +86,16 @@ const renderActivityItem = (
         {item.summary !== undefined ? <span className="chat-ui-activity-summary">{item.summary}</span> : null}
         <time>{formatTime(item.occurredAt)}</time>
       </button>
-      {unreadNotificationId !== undefined ? (
-        <button type="button" onClick={() => onMarkNotificationRead(unreadNotificationId)}>
-          Mark read
+      <div className="chat-ui-activity-actions" aria-label={`Actions for ${item.title}`}>
+        <button type="button" onClick={() => onCopyActivityReference(item)}>
+          Copy ref
         </button>
-      ) : null}
+        {unreadNotificationId !== undefined ? (
+          <button type="button" onClick={() => onMarkNotificationRead(unreadNotificationId)}>
+            Mark read
+          </button>
+        ) : null}
+      </div>
     </article>
   );
 };
@@ -90,11 +103,16 @@ const renderActivityItem = (
 export const ActivityPanel = ({
   items,
   isLoading,
+  canOpenLatestUnread,
+  canOpenRecentTask,
   emptyLabel = 'No activity yet.',
   isShortcutHelpOpen,
   shortcutHelpButtonRef,
   onActivityItemClick,
+  onCopyActivityReference,
   onMarkNotificationRead,
+  onOpenLatestUnread,
+  onOpenRecentTask,
   onShortcutHelpOpenChange,
   onEscape,
 }: ActivityPanelProps): ReactElement => {
@@ -152,6 +170,18 @@ export const ActivityPanel = ({
       return;
     }
 
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') {
+      event.preventDefault();
+      onCopyActivityReference(item);
+      return;
+    }
+
+    if (event.shiftKey && event.key === 'Enter' && item.notificationId !== undefined) {
+      event.preventDefault();
+      onMarkNotificationRead(item.notificationId);
+      return;
+    }
+
     if (event.key === 'Escape') {
       event.preventDefault();
       event.currentTarget.blur();
@@ -182,6 +212,26 @@ export const ActivityPanel = ({
         </div>
         <div className="chat-ui-panel-header-actions">
           {isLoading ? <span>Loading...</span> : null}
+          <button
+            type="button"
+            className="chat-ui-panel-action"
+            onClick={onOpenLatestUnread}
+            disabled={!canOpenLatestUnread}
+            aria-label="Open latest unread activity"
+            title="Open latest unread activity"
+          >
+            Unread
+          </button>
+          <button
+            type="button"
+            className="chat-ui-panel-action"
+            onClick={onOpenRecentTask}
+            disabled={!canOpenRecentTask}
+            aria-label="Reopen recent task"
+            title="Reopen recent task"
+          >
+            Recent
+          </button>
           <button
             ref={shortcutHelpButtonRef}
             type="button"
@@ -226,6 +276,7 @@ export const ActivityPanel = ({
               renderActivityItem(
                 item,
                 onActivityItemClick,
+                onCopyActivityReference,
                 onMarkNotificationRead,
                 registerActivityButton,
                 handleActivityItemKeyDown,
@@ -243,6 +294,7 @@ export const ActivityPanel = ({
               renderActivityItem(
                 item,
                 onActivityItemClick,
+                onCopyActivityReference,
                 onMarkNotificationRead,
                 registerActivityButton,
                 handleActivityItemKeyDown,

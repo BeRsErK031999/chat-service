@@ -424,7 +424,18 @@
 .chat-ui-panel-header-actions {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.chat-ui-panel-action {
+  min-height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: #405064;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .chat-ui-shortcuts-button {
@@ -535,9 +546,21 @@
   color: #7a8795;
 }
 
-.chat-ui-activity-item > button:not(.chat-ui-activity-open) {
-  justify-self: start;
-  margin: 0 0 8px 8px;
+.chat-ui-activity-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  opacity: 0.82;
+  padding: 0 8px 8px;
+}
+
+.chat-ui-activity-item:focus-within .chat-ui-activity-actions,
+.chat-ui-activity-item:hover .chat-ui-activity-actions {
+  opacity: 1;
+}
+
+.chat-ui-activity-actions button {
   min-height: 24px;
   padding: 0 8px;
   border-radius: 6px;
