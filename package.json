@@ -28,6 +28,7 @@
     "check:chat-env": "node scripts/check-chat-env.cjs",
     "chat:smoke-checklist": "node scripts/print-chat-smoke-checklist.cjs",
     "chat:realtime-stress-checklist": "node scripts/print-realtime-stress-checklist.cjs",
+    "chat:rollout-checklist": "node scripts/print-chat-rollout-checklist.cjs",
     "format": "prettier --write ."
   },
   "dependencies": {

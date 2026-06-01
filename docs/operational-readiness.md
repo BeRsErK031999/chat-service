@@ -7,6 +7,10 @@ collaboration platform. It complements the deploy details in `docs/server-deploy
 For the freeze-audit view of critical runtime/security/navigation invariants and how each one is protected, see
 `docs/chat-runtime-readiness-matrix.md`.
 
+For the limited desktop beta rollout contract, see `docs/chat-controlled-rollout.md`. The rollout gate controls the
+desktop entry point only; it does not replace bearer auth, room permissions, SSE, ActivityPanel behavior, navigation
+continuity, or diagnostics.
+
 ## Release Gate
 
 Use this gate before promoting `develop` to `main` or before treating a staging deploy as rollout-ready.
@@ -32,6 +36,7 @@ Use this gate before promoting `develop` to `main` or before treating a staging 
    yarn check:chat-env
    yarn chat:smoke-checklist
    yarn chat:realtime-stress-checklist
+   yarn chat:rollout-checklist
    git diff --check
    ```
 
@@ -43,6 +48,7 @@ Use this gate before promoting `develop` to `main` or before treating a staging 
      limitation checklist.
    - `yarn chat:realtime-stress-checklist` prints the long-session room switching, overlay reopen, reconnect cycle, and
      safe diagnostic review flow.
+   - `yarn chat:rollout-checklist` prints the controlled desktop rollout gate, beta smoke, and rollback checklist.
    - Neither helper prints secret values, makes network requests, deploys, opens Electron, or proves that staging is
      reachable.
 
