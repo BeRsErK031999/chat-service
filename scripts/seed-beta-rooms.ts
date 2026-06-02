@@ -173,13 +173,7 @@ const upsertBetaUsers = async (): Promise<BetaUsers> => {
 
 const upsertRoom = async (seed: BetaRoomSeed, createdByUserId: string): Promise<Room> => {
   const existingRoom = await prisma.room.findFirst({
-    where: {
-      name: seed.name,
-      type: seed.type,
-      taskId: seed.taskId ?? null,
-      projectId: seed.projectId ?? null,
-      taskRoomKind: seed.taskRoomKind ?? null,
-    },
+    where: { createdByEventId: `beta-seed:${seed.key}:room` },
   });
 
   const data = {
@@ -191,6 +185,7 @@ const upsertRoom = async (seed: BetaRoomSeed, createdByUserId: string): Promise<
     projectId: seed.projectId ?? null,
     taskRoomKind: seed.taskRoomKind ?? null,
     createdByUserId,
+    createdByEventId: `beta-seed:${seed.key}:room`,
     isArchived: false,
   };
 
