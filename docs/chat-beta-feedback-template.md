@@ -1,29 +1,26 @@
 # Chat Beta Feedback Template
 
-## Tester
+Copy one message into the `Chat Beta Feedback` group for each separate issue.
 
-- Name:
-- Date:
-- Build version / commit:
+```text
+[Critical | Major | Minor | Idea]
 
-## Scope
+What did I do:
 
-- What was tested:
-- What worked:
-- What did not work:
+What did I expect:
 
-## Bugs
+What happened:
 
-- Steps to reproduce:
-- Expected result:
-- Actual result:
-- Severity: Critical / Major / Minor
+Build version:
 
-## Evidence
+Screenshot or short video:
+```
 
-- Screenshots:
-- Logs:
+Severity:
 
-## Usability Notes
+- `Critical` - blocks chat usage or prevents the tester from continuing.
+- `Major` - strongly interferes with normal testing, but a workaround exists.
+- `Minor` - inconvenience, visual issue, confusing behavior, or small improvement.
+- `Idea` - suggestion for a future version.
 
-- Comments:
+Do not include passwords, bearer tokens, authorization headers, or internal secrets in screenshots, logs, or copied text.
