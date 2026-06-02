@@ -21,6 +21,10 @@ Use these main-process desktop env values:
 CHAT_ENABLED=false
 CHAT_BETA_USER_IDS=
 CHAT_BETA_EMAILS=
+CHAT_IDENTITY_MODE=mock
+CHAT_MOCK_USER_ID=
+CHAT_MOCK_USER_EMAIL=
+CHAT_MOCK_USER_DISPLAY_NAME=
 ```
 
 `CHAT_ENABLED=false` is the default production posture. It hides chat from ordinary desktop users. Internal beta users can
@@ -28,6 +32,13 @@ still be allowed by `CHAT_BETA_USER_IDS` or `CHAT_BETA_EMAILS`, which are matche
 `/employees/me/` identity in Electron main.
 
 Set `CHAT_ENABLED=true` only when the desktop chat entry point should be available to all authenticated desktop users.
+
+`CHAT_IDENTITY_MODE=mock` is only for desktop beta/dev/test in Electron main. Production default must remain the
+current production-style identity flow. If mock mode is enabled, Electron main must fail closed unless the mock user ID,
+email, and display name are configured. Renderer code must not receive the signing secret or a raw identity payload.
+
+For seeded `chat-service` beta rooms, use the UUID user ID printed by `yarn chat:seed-beta-rooms`; the friendly mock ID
+is stored on the user as `externalUserId`.
 
 ## Rollback
 

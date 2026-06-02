@@ -29,6 +29,28 @@ $env:DATABASE_URL="postgresql://postgres:postgres@localhost:55432/chat_service?s
 The seed is idempotent. Re-running it updates the same dev users, room, memberships, messages, read states, and
 employee notification instead of creating duplicates.
 
+## Run Beta Room Seed
+
+For desktop beta testing, use the separate beta seed. It creates stable beta users, five beta rooms, messages, read
+states, and notification/activity examples without deleting real data.
+
+PowerShell:
+
+```powershell
+$env:DATABASE_URL="postgresql://postgres:postgres@localhost:55432/chat_service?schema=public"
+$env:CHAT_BETA_SEED_TARGET="staging"
+yarn chat:seed-beta-rooms
+```
+
+Dry run:
+
+```powershell
+$env:CHAT_BETA_SEED_TARGET="staging"
+yarn chat:seed-beta-rooms --dry-run
+```
+
+The command refuses targets outside `development`, `dev`, `test`, and `staging`.
+
 ## Check API
 
 Start the service:

@@ -21,6 +21,8 @@
     "db:seed": "tsx scripts/seed-dev.ts",
     "dev:seed": "tsx scripts/seed-dev.ts",
     "dev:seed:server": "node dist/scripts/seed-dev.js",
+    "chat:seed-beta-rooms": "tsx scripts/seed-beta-rooms.ts",
+    "chat:seed-beta-rooms:server": "node dist/scripts/seed-beta-rooms.js",
     "db:studio": "prisma studio",
     "deploy:server": "powershell -ExecutionPolicy Bypass -File scripts/deploy-server.ps1",
     "deploy:migrate:server": "powershell -ExecutionPolicy Bypass -File scripts/migrate-server.ps1",
